@@ -59,20 +59,34 @@ See, Microslop's Notepad sucks and Notepad++ also faced a recent vulnerability. 
 
 ## Installation
 
-As a pre-alpha setup, there are no official releases yet. But you can clone the repository and run
-it locally.
+### Download Pre-built Releases
 
-### Prerequisites
+You can download the latest pre-built releases for your platform:
+
+1. Visit the [Releases](https://github.com/drexfall/goatpad/releases) page
+2. Download the appropriate file for your platform:
+   - **Windows**: `goatpad-windows-x64.zip` - Extract and run `goatpad.exe`
+   - **Linux**: `goatpad-linux-x64.tar.gz` - Extract and run the executable
+   - **Android**: `app-release.apk` - Install on your device
+
+### Build from Source
+
+If you prefer to build from source, follow these steps:
+
+#### Prerequisites
 
 - Flutter SDK (3.9.2 or higher)
 - Dart SDK
 - Willpower to download and run a text editor from GitHub
 
-### Setup
+#### Setup
 
-1. Clone the repository
-2. Navigate to the project directory
-3. Install dependencies:
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/drexfall/goatpad.git
+   cd goatpad
+   ```
+2. Install dependencies:
    ```bash
    flutter pub get
    ```
