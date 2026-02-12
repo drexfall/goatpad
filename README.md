@@ -1,13 +1,23 @@
-![goatpad-logo.png](goatpad-logo.png)
+<div align="center">
+  <a href="https://github.com/drexfall/goatpad">
+    <img src="./goatpad-logo.png" alt="Logo" width="200" height="200">
+  </a>
 
-# GOATPad
+  <h1 align="center">GOATpad</h1>
 
-is a simple, modern, cross-platform text editor built with Flutter, and a hell lot of coffee.
+  <p align="center">
+    <strong>The Greatest Of All Text editors</strong>
+   
+  </p>
+  <p> Presenting a is a simple, modern, cross-platform text editor built with Flutter, and a hell lot of coffee.</p>
+  <br />
+</div>
+
+
 
 ## Why GOATpad?
 
-Because it's the Greatest Of All Text Editors, at least in my opinion.
-See, Notepad sucks and Notepad++ also faced a recent vulnerability. But not GOATpad!
+See, Microslop's Notepad sucks and Notepad++ also faced a recent vulnerability. But GOATpad shall never!
 
 ![img.png](img.png)
 
