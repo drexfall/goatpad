@@ -128,7 +128,7 @@ The workflow is defined in `.github/workflows/release.yml`.
 
 ### Key Settings
 
-- **Flutter Version**: Currently set to 3.27.1 (stable)
+- **Flutter Version**: Currently set to 3.24.0 (stable)
 - **Java Version**: 17 (Zulu distribution)
 - **Platforms**: Android, Linux, Windows
 

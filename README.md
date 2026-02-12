@@ -75,8 +75,8 @@ If you prefer to build from source, follow these steps:
 
 #### Prerequisites
 
-- Flutter SDK (3.9.2 or higher)
-- Dart SDK
+- Flutter SDK (3.5.0 or higher)
+- Dart SDK (3.5.0 or higher)
 - Willpower to download and run a text editor from GitHub
 
 #### Setup
