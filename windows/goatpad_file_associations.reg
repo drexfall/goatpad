@@ -1,0 +1,49 @@
+Windows Registry Editor Version 5.00
+
+; File association for .txt files
+[HKEY_CLASSES_ROOT\.txt]
+@="txtfile"
+
+[HKEY_CLASSES_ROOT\.txt\OpenWithProgids]
+"goatpad.txt"=""
+
+; File association for .json files
+[HKEY_CLASSES_ROOT\.json]
+@="jsonfile"
+
+[HKEY_CLASSES_ROOT\.json\OpenWithProgids]
+"goatpad.json"=""
+
+; Application registration for Goatpad
+[HKEY_CLASSES_ROOT\goatpad.txt]
+@="Text File - Goatpad"
+"FriendlyTypeName"="Text File"
+
+[HKEY_CLASSES_ROOT\goatpad.txt\DefaultIcon]
+@="goatpad.exe,0"
+
+[HKEY_CLASSES_ROOT\goatpad.txt\shell\open\command]
+@="\"goatpad.exe\" \"%%1\""
+
+[HKEY_CLASSES_ROOT\goatpad.json]
+@="JSON File - Goatpad"
+"FriendlyTypeName"="JSON File"
+
+[HKEY_CLASSES_ROOT\goatpad.json\DefaultIcon]
+@="goatpad.exe,0"
+
+[HKEY_CLASSES_ROOT\goatpad.json\shell\open\command]
+@="\"goatpad.exe\" \"%%1\""
+
+; Add to Open With menu for .txt files
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.txt\UserChoice]
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.txt\UserChoice]
+; User can select Goatpad as default or optional application
+
+; Add to Open With menu for .json files
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.json\UserChoice]
+
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.json\UserChoice]
+; User can select Goatpad as default or optional application
+

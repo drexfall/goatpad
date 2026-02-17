@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:goatpad/toolbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -56,16 +56,16 @@ class CustomTheme {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'backgroundColor': _colorToInt(backgroundColor),
-    'surfaceColor': _colorToInt(surfaceColor),
-    'primaryColor': _colorToInt(primaryColor),
-    'textColor': _colorToInt(textColor),
-    'secondaryTextColor': _colorToInt(secondaryTextColor),
-    'accentColor': _colorToInt(accentColor),
-    'brightness': brightness == Brightness.dark ? 'dark' : 'light',
-  };
+        'id': id,
+        'name': name,
+        'backgroundColor': _colorToInt(backgroundColor),
+        'surfaceColor': _colorToInt(surfaceColor),
+        'primaryColor': _colorToInt(primaryColor),
+        'textColor': _colorToInt(textColor),
+        'secondaryTextColor': _colorToInt(secondaryTextColor),
+        'accentColor': _colorToInt(accentColor),
+        'brightness': brightness == Brightness.dark ? 'dark' : 'light',
+      };
 
   static int _colorToInt(Color color) {
     return (color.a * 255).round() << 24 |
@@ -75,87 +75,102 @@ class CustomTheme {
   }
 
   factory CustomTheme.fromJson(Map<String, dynamic> json) => CustomTheme(
-    id: json['id'],
-    name: json['name'],
-    backgroundColor: Color(json['backgroundColor']),
-    surfaceColor: Color(json['surfaceColor']),
-    primaryColor: Color(json['primaryColor']),
-    textColor: Color(json['textColor']),
-    secondaryTextColor: Color(json['secondaryTextColor']),
-    accentColor: Color(json['accentColor']),
-    brightness: json['brightness'] == 'dark'
-        ? Brightness.dark
-        : Brightness.light,
-  );
+        id: json['id'],
+        name: json['name'],
+        backgroundColor: Color(json['backgroundColor']),
+        surfaceColor: Color(json['surfaceColor']),
+        primaryColor: Color(json['primaryColor']),
+        textColor: Color(json['textColor']),
+        secondaryTextColor: Color(json['secondaryTextColor']),
+        accentColor: Color(json['accentColor']),
+        brightness:
+            json['brightness'] == 'dark' ? Brightness.dark : Brightness.light,
+      );
 
   static List<CustomTheme> get defaultThemes => [
-    CustomTheme(
-      id: 'light',
-      name: 'Light',
-      backgroundColor: const Color(0xFFFAFAFA),
-      surfaceColor: const Color(0xFFFFFFFF),
-      primaryColor: const Color(0xFF1976D2),
-      textColor: const Color(0xFF212121),
-      secondaryTextColor: const Color(0xFF757575),
-      accentColor: const Color(0xFF2196F3),
-      brightness: Brightness.light,
-    ),
-    CustomTheme(
-      id: 'dark',
-      name: 'Dark',
-      backgroundColor: const Color(0xFF121212),
-      surfaceColor: const Color(0xFF1E1E1E),
-      primaryColor: const Color(0xFF90CAF9),
-      textColor: const Color(0xFFE0E0E0),
-      secondaryTextColor: const Color(0xFFB0B0B0),
-      accentColor: const Color(0xFF64B5F6),
-      brightness: Brightness.dark,
-    ),
-    CustomTheme(
-      id: 'nord',
-      name: 'Nord',
-      backgroundColor: const Color(0xFF2E3440),
-      surfaceColor: const Color(0xFF3B4252),
-      primaryColor: const Color(0xFF88C0D0),
-      textColor: const Color(0xFFECEFF4),
-      secondaryTextColor: const Color(0xFFD8DEE9),
-      accentColor: const Color(0xFF81A1C1),
-      brightness: Brightness.dark,
-    ),
-    CustomTheme(
-      id: 'monokai',
-      name: 'Monokai',
-      backgroundColor: const Color(0xFF272822),
-      surfaceColor: const Color(0xFF1E1F1C),
-      primaryColor: const Color(0xFFF92672),
-      textColor: const Color(0xFFF8F8F2),
-      secondaryTextColor: const Color(0xFFA6E22E),
-      accentColor: const Color(0xFFE6DB74),
-      brightness: Brightness.dark,
-    ),
-    CustomTheme(
-      id: 'solarized',
-      name: 'Solarized Light',
-      backgroundColor: const Color(0xFFFDF6E3),
-      surfaceColor: const Color(0xFFEEE8D5),
-      primaryColor: const Color(0xFF268BD2),
-      textColor: const Color(0xFF586E75),
-      secondaryTextColor: const Color(0xFF657B83),
-      accentColor: const Color(0xFF2AA198),
-      brightness: Brightness.light,
-    ),
-    CustomTheme(
-      id: 'dracula',
-      name: 'Dracula',
-      backgroundColor: const Color(0xFF282A36),
-      surfaceColor: const Color(0xFF44475A),
-      primaryColor: const Color(0xFFBD93F9),
-      textColor: const Color(0xFFF8F8F2),
-      secondaryTextColor: const Color(0xFF6272A4),
-      accentColor: const Color(0xFFFF79C6),
-      brightness: Brightness.dark,
-    ),
-  ];
+        CustomTheme(
+          id: 'light',
+          name: 'Light',
+          backgroundColor: const Color(0xFFFAFAFA),
+          surfaceColor: const Color(0xFFFFFFFF),
+          primaryColor: const Color(0xFF1976D2),
+          textColor: const Color(0xFF212121),
+          secondaryTextColor: const Color(0xFF757575),
+          accentColor: const Color(0xFF2196F3),
+          brightness: Brightness.light,
+        ),
+        CustomTheme(
+          id: 'dark',
+          name: 'Dark',
+          backgroundColor: const Color(0xFF121212),
+          surfaceColor: const Color(0xFF1E1E1E),
+          primaryColor: const Color(0xFF90CAF9),
+          textColor: const Color(0xFFE0E0E0),
+          secondaryTextColor: const Color(0xFFB0B0B0),
+          accentColor: const Color(0xFF64B5F6),
+          brightness: Brightness.dark,
+        ),
+        CustomTheme(
+          id: 'nord',
+          name: 'Nord',
+          backgroundColor: const Color(0xFF2E3440),
+          surfaceColor: const Color(0xFF3B4252),
+          primaryColor: const Color(0xFF88C0D0),
+          textColor: const Color(0xFFECEFF4),
+          secondaryTextColor: const Color(0xFFD8DEE9),
+          accentColor: const Color(0xFF81A1C1),
+          brightness: Brightness.dark,
+        ),
+        CustomTheme(
+          id: 'monokai',
+          name: 'Monokai',
+          backgroundColor: const Color(0xFF272822),
+          surfaceColor: const Color(0xFF1E1F1C),
+          primaryColor: const Color(0xFFF92672),
+          textColor: const Color(0xFFF8F8F2),
+          secondaryTextColor: const Color(0xFFA6E22E),
+          accentColor: const Color(0xFFE6DB74),
+          brightness: Brightness.dark,
+        ),
+        CustomTheme(
+          id: 'solarized',
+          name: 'Solarized Light',
+          backgroundColor: const Color(0xFFFDF6E3),
+          surfaceColor: const Color(0xFFEEE8D5),
+          primaryColor: const Color(0xFF268BD2),
+          textColor: const Color(0xFF586E75),
+          secondaryTextColor: const Color(0xFF657B83),
+          accentColor: const Color(0xFF2AA198),
+          brightness: Brightness.light,
+        ),
+        CustomTheme(
+          id: 'dracula',
+          name: 'Dracula',
+          backgroundColor: const Color(0xFF282A36),
+          surfaceColor: const Color(0xFF44475A),
+          primaryColor: const Color(0xFFBD93F9),
+          textColor: const Color(0xFFF8F8F2),
+          secondaryTextColor: const Color(0xFF6272A4),
+          accentColor: const Color(0xFFFF79C6),
+          brightness: Brightness.dark,
+        ),
+      ];
+}
+
+class EditorTab {
+  final String id;
+  final TextEditingController controller;
+  String? filePath;
+  bool hasUnsavedChanges;
+
+  EditorTab({
+    required this.id,
+    required this.controller,
+    this.filePath,
+    this.hasUnsavedChanges = false,
+  });
+
+  String get fileName => filePath?.split('/').last ?? 'Untitled';
 }
 
 class TextEditorScreen extends StatefulWidget {
@@ -168,14 +183,13 @@ class TextEditorScreen extends StatefulWidget {
 }
 
 class _TextEditorScreenState extends State<TextEditorScreen> {
-  final TextEditingController _textController = TextEditingController();
+  List<EditorTab> _tabs = [];
+  int _currentTabIndex = 0;
   List<CustomTheme> _themes = [];
   int _currentThemeIndex = 0;
   String _selectedFont = 'Roboto';
   double _fontSize = 16.0;
   FontWeight _fontWeight = FontWeight.normal;
-  String? _currentFilePath;
-  bool _hasUnsavedChanges = false;
 
   final List<String> _availableFonts = [
     'Roboto',
@@ -216,18 +230,71 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   void initState() {
     super.initState();
     _loadSettings();
-    _textController.addListener(_onTextChanged);
+    // Create initial empty tab
+    _createNewTab();
   }
 
   @override
   void dispose() {
-    _textController.dispose();
+    for (var tab in _tabs) {
+      tab.controller.dispose();
+    }
     super.dispose();
   }
 
-  void _onTextChanged() {
-    if (!_hasUnsavedChanges) {
-      setState(() => _hasUnsavedChanges = true);
+  EditorTab get _currentTab => _tabs[_currentTabIndex];
+
+  void _createNewTab({String? filePath, String? content}) {
+    final controller = TextEditingController(text: content ?? '');
+
+    final tab = EditorTab(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      controller: controller,
+      filePath: filePath,
+      hasUnsavedChanges: false,
+    );
+
+    setState(() {
+      _tabs.add(tab);
+      _currentTabIndex = _tabs.length - 1;
+    });
+
+    // Add listener after adding tab to list
+    controller.addListener(() {
+      final tabIndex = _tabs.indexWhere((t) => t.id == tab.id);
+      if (tabIndex != -1) {
+        _onTextChanged(tabIndex);
+      }
+    });
+  }
+
+  void _closeTab(int index) async {
+    if (_tabs[index].hasUnsavedChanges) {
+      final shouldClose = await _showUnsavedDialog();
+      if (shouldClose != true) return;
+    }
+
+    setState(() {
+      _tabs[index].controller.dispose();
+      _tabs.removeAt(index);
+
+      if (_tabs.isEmpty) {
+        _createNewTab();
+      } else if (_currentTabIndex >= _tabs.length) {
+        _currentTabIndex = _tabs.length - 1;
+      }
+    });
+  }
+
+  void _switchTab(int index) {
+    setState(() {
+      _currentTabIndex = index;
+    });
+  }
+
+  void _onTextChanged(int tabIndex) {
+    if (tabIndex < _tabs.length && !_tabs[tabIndex].hasUnsavedChanges) {
+      setState(() => _tabs[tabIndex].hasUnsavedChanges = true);
     }
   }
 
@@ -276,35 +343,38 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 
   Future<void> _openFile() async {
-    if (_hasUnsavedChanges) {
-      final shouldContinue = await _showUnsavedDialog();
-      if (shouldContinue != true) return;
-    }
-
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt'],
     );
 
     if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
+      final filePath = result.files.single.path!;
+
+      // Check if file is already open in a tab
+      final existingTabIndex =
+          _tabs.indexWhere((tab) => tab.filePath == filePath);
+      if (existingTabIndex != -1) {
+        setState(() {
+          _currentTabIndex = existingTabIndex;
+        });
+        _showSnackBar('File already open');
+        return;
+      }
+
+      final file = File(filePath);
       final content = await file.readAsString();
 
-      setState(() {
-        _textController.text = content;
-        _currentFilePath = result.files.single.path;
-        _hasUnsavedChanges = false;
-      });
-
+      _createNewTab(filePath: filePath, content: content);
       _showSnackBar('File opened successfully');
     }
   }
 
   Future<void> _saveFile() async {
-    if (_currentFilePath != null) {
-      final file = File(_currentFilePath!);
-      await file.writeAsString(_textController.text);
-      setState(() => _hasUnsavedChanges = false);
+    if (_currentTab.filePath != null) {
+      final file = File(_currentTab.filePath!);
+      await file.writeAsString(_currentTab.controller.text);
+      setState(() => _currentTab.hasUnsavedChanges = false);
       _showSnackBar('File saved successfully');
     } else {
       await _saveFileAs();
@@ -321,11 +391,11 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
     if (path != null) {
       final file = File(path);
-      await file.writeAsString(_textController.text);
+      await file.writeAsString(_currentTab.controller.text);
 
       setState(() {
-        _currentFilePath = path;
-        _hasUnsavedChanges = false;
+        _currentTab.filePath = path;
+        _currentTab.hasUnsavedChanges = false;
       });
 
       _showSnackBar('File saved successfully');
@@ -333,16 +403,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 
   Future<void> _newFile() async {
-    if (_hasUnsavedChanges) {
-      final shouldContinue = await _showUnsavedDialog();
-      if (shouldContinue != true) return;
-    }
-
-    setState(() {
-      _textController.clear();
-      _currentFilePath = null;
-      _hasUnsavedChanges = false;
-    });
+    _createNewTab();
   }
 
   Future<bool?> _showUnsavedDialog() {
@@ -390,7 +451,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         content: SizedBox(
           width: 300,
           height: 300,
-          child: _textController.text.isEmpty
+          child: _currentTab.controller.text.isEmpty
               ? Center(
                   child: Text(
                     'No text to share',
@@ -398,7 +459,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                   ),
                 )
               : QrImageView(
-                  data: _textController.text,
+                  data: _currentTab.controller.text,
                   version: QrVersions.auto,
                   size: 280,
                   backgroundColor: Colors.white,
@@ -422,8 +483,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           theme: _themes[_currentThemeIndex],
           onScan: (text) {
             setState(() {
-              _textController.text = text;
-              _hasUnsavedChanges = true;
+              _currentTab.controller.text = text;
+              _currentTab.hasUnsavedChanges = true;
             });
           },
         ),
@@ -432,8 +493,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 
   void _shareText() {
-    if (_textController.text.isNotEmpty) {
-      Share.share(_textController.text);
+    if (_currentTab.controller.text.isNotEmpty) {
+      Share.share(_currentTab.controller.text);
     }
   }
 
@@ -726,52 +787,51 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children:
-                    [
-                          Colors.red,
-                          Colors.pink,
-                          Colors.purple,
-                          Colors.deepPurple,
-                          Colors.indigo,
-                          Colors.blue,
-                          Colors.lightBlue,
-                          Colors.cyan,
-                          Colors.teal,
-                          Colors.green,
-                          Colors.lightGreen,
-                          Colors.lime,
-                          Colors.yellow,
-                          Colors.amber,
-                          Colors.orange,
-                          Colors.deepOrange,
-                          Colors.brown,
-                          Colors.grey,
-                          Colors.blueGrey,
-                          Colors.black,
-                          Colors.white,
-                        ]
-                        .map(
-                          (color) => GestureDetector(
-                            onTap: () {
-                              Navigator.pop(context, color);
-                            },
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: color == selectedColor
-                                      ? theme.accentColor
-                                      : theme.secondaryTextColor,
-                                  width: color == selectedColor ? 3 : 1,
-                                ),
-                              ),
+                children: [
+                  Colors.red,
+                  Colors.pink,
+                  Colors.purple,
+                  Colors.deepPurple,
+                  Colors.indigo,
+                  Colors.blue,
+                  Colors.lightBlue,
+                  Colors.cyan,
+                  Colors.teal,
+                  Colors.green,
+                  Colors.lightGreen,
+                  Colors.lime,
+                  Colors.yellow,
+                  Colors.amber,
+                  Colors.orange,
+                  Colors.deepOrange,
+                  Colors.brown,
+                  Colors.grey,
+                  Colors.blueGrey,
+                  Colors.black,
+                  Colors.white,
+                ]
+                    .map(
+                      (color) => GestureDetector(
+                        onTap: () {
+                          Navigator.pop(context, color);
+                        },
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: color == selectedColor
+                                  ? theme.accentColor
+                                  : theme.secondaryTextColor,
+                              width: color == selectedColor ? 3 : 1,
                             ),
                           ),
-                        )
-                        .toList(),
+                        ),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
           ),
@@ -782,150 +842,208 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
   void _showSettingsPanel() {
     final theme = _themes[_currentThemeIndex];
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: theme.surfaceColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: const EdgeInsets.all(24),
-          height: MediaQuery.of(context).size.height * 0.75,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Settings',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: theme.textColor,
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: theme.textColor),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: ListView(
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWideScreen = screenWidth > 900;
+
+    if (isWideScreen) {
+      // Show as a side panel on wide screens
+      Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              SettingsPanelScreen(
+            theme: theme,
+            themes: _themes,
+            currentThemeIndex: _currentThemeIndex,
+            selectedFont: _selectedFont,
+            fontSize: _fontSize,
+            fontWeight: _fontWeight,
+            fontWeights: _fontWeights,
+            availableFonts: _availableFonts,
+            onThemeChanged: (index) {
+              setState(() => _currentThemeIndex = index);
+              _saveSettings();
+            },
+            onFontChanged: (font) {
+              setState(() => _selectedFont = font);
+              _saveSettings();
+            },
+            onFontWeightChanged: (weight) {
+              setState(() => _fontWeight = weight);
+              _saveSettings();
+            },
+            onFontSizeChanged: (size) {
+              setState(() => _fontSize = size);
+              _saveSettings();
+            },
+            onThemeCreated: (newTheme) {
+              setState(() {
+                _themes.add(newTheme);
+                _currentThemeIndex = _themes.length - 1;
+              });
+              _saveSettings();
+            },
+            onShowThemePicker: _showThemePicker,
+          ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(1.0, 0.0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            );
+          },
+        ),
+      );
+    } else {
+      // Show as bottom sheet on small screens
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: theme.surfaceColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (context) => StatefulBuilder(
+          builder: (context, setModalState) => Container(
+            padding: const EdgeInsets.all(24),
+            height: MediaQuery.of(context).size.height * 0.75,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildSettingsTile(
-                      icon: Icons.font_download,
-                      title: 'Font Family',
-                      subtitle: _selectedFont,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showFontPicker();
-                      },
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSettingsTile(
-                      icon: Icons.format_bold,
-                      title: 'Font Weight',
-                      subtitle: _fontWeights.entries
-                          .firstWhere((e) => e.value == _fontWeight)
-                          .key,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showFontWeightPicker();
-                      },
-                      theme: theme,
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: theme.backgroundColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.format_size,
-                                color: theme.accentColor,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Font Size',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                        color: theme.textColor,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${_fontSize.toStringAsFixed(0)} pt',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: theme.secondaryTextColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          SliderTheme(
-                            data: SliderThemeData(
-                              activeTrackColor: theme.accentColor,
-                              inactiveTrackColor: theme.secondaryTextColor
-                                  .withValues(alpha: 0.3),
-                              thumbColor: theme.accentColor,
-                              overlayColor: theme.accentColor.withValues(
-                                alpha: 0.2,
-                              ),
-                            ),
-                            child: Slider(
-                              value: _fontSize,
-                              min: 10,
-                              max: 40,
-                              divisions: 30,
-                              onChanged: (value) {
-                                setState(() => _fontSize = value);
-                                setModalState(() => _fontSize = value);
-                                _saveSettings();
-                              },
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'Settings',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: theme.textColor,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    _buildSettingsTile(
-                      icon: Icons.palette,
-                      title: 'Theme',
-                      subtitle: _themes[_currentThemeIndex].name,
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showThemePicker();
-                      },
-                      theme: theme,
+                    IconButton(
+                      icon: Icon(Icons.close, color: theme.textColor),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      _buildSettingsTile(
+                        icon: Icons.font_download,
+                        title: 'Font Family',
+                        subtitle: _selectedFont,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showFontPicker();
+                        },
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSettingsTile(
+                        icon: Icons.format_bold,
+                        title: 'Font Weight',
+                        subtitle: _fontWeights.entries
+                            .firstWhere((e) => e.value == _fontWeight)
+                            .key,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showFontWeightPicker();
+                        },
+                        theme: theme,
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.backgroundColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.format_size,
+                                  color: theme.accentColor,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Font Size',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                          color: theme.textColor,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${_fontSize.toStringAsFixed(0)} pt',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: theme.secondaryTextColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SliderTheme(
+                              data: SliderThemeData(
+                                activeTrackColor: theme.accentColor,
+                                inactiveTrackColor: theme.secondaryTextColor
+                                    .withValues(alpha: 0.3),
+                                thumbColor: theme.accentColor,
+                                overlayColor: theme.accentColor.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
+                              child: Slider(
+                                value: _fontSize,
+                                min: 10,
+                                max: 40,
+                                divisions: 30,
+                                onChanged: (value) {
+                                  setState(() => _fontSize = value);
+                                  setModalState(() => _fontSize = value);
+                                  _saveSettings();
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSettingsTile(
+                        icon: Icons.palette,
+                        title: 'Theme',
+                        subtitle: _themes[_currentThemeIndex].name,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _showThemePicker();
+                        },
+                        theme: theme,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   Widget _buildSettingsTile({
@@ -981,230 +1099,24 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = _themes[_currentThemeIndex];
-    final fileName = _currentFilePath?.split('/').last ?? 'Untitled';
-
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
         backgroundColor: theme.surfaceColor,
         elevation: 0,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'goatpad-logo.png',
-              height: 32,
-              width: 32,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              fileName + (_hasUnsavedChanges ? ' *' : ''),
-              style: TextStyle(
-                color: theme.textColor,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              width: 1,
-              height: 24,
-              color: theme.secondaryTextColor.withValues(alpha: 0.3),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: theme.surfaceColor,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  _buildToolbarButton(
-                    icon: Icons.content_cut,
-                    tooltip: 'Cut',
-                    onPressed: () {
-                      final selection = _textController.selection;
-                      if (selection.isValid && !selection.isCollapsed) {
-                        Clipboard.setData(
-                          ClipboardData(
-                            text: _textController.text.substring(
-                              selection.start,
-                              selection.end,
-                            ),
-                          ),
-                        );
-                        setState(() {
-                          _textController.text = _textController.text
-                              .replaceRange(selection.start, selection.end, '');
-                        });
-                      }
-                    },
-                    theme: theme,
-                  ),
-                  _buildToolbarButton(
-                    icon: Icons.content_copy,
-                    tooltip: 'Copy',
-                    onPressed: () {
-                      final selection = _textController.selection;
-                      if (selection.isValid && !selection.isCollapsed) {
-                        Clipboard.setData(
-                          ClipboardData(
-                            text: _textController.text.substring(
-                              selection.start,
-                              selection.end,
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    theme: theme,
-                  ),
-                  _buildToolbarButton(
-                    icon: Icons.content_paste,
-                    tooltip: 'Paste',
-                    onPressed: () async {
-                      final data = await Clipboard.getData('text/plain');
-                      if (data?.text != null) {
-                        final selection = _textController.selection;
-                        final text = _textController.text;
-                        final newText = text.replaceRange(
-                          selection.start,
-                          selection.end,
-                          data!.text!,
-                        );
-                        setState(() {
-                          _textController.text = newText;
-                          _textController.selection = TextSelection.collapsed(
-                            offset: selection.start + data.text!.length,
-                          );
-                        });
-                      }
-                    },
-                    theme: theme,
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 1,
-                    height: 24,
-                    color: theme.secondaryTextColor.withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildToolbarButton(
-                    icon: Icons.undo,
-                    tooltip: 'Undo',
-                    onPressed: () {},
-                    theme: theme,
-                  ),
-                  _buildToolbarButton(
-                    icon: Icons.redo,
-                    tooltip: 'Redo',
-                    onPressed: () {},
-                    theme: theme,
-                  ),
-                ],
-              ),
-            ),
-          ],
+        toolbarHeight: 56,
+        title: Toolbar(
+          theme: theme,
+          textController: _currentTab.controller,
+          handleNewFile: _newFile,
+          handleFileOpen: _openFile,
+          handleQR: _showQRCode,
+          handleQRScan: _scanQRCode,
+          handleSave: _saveFile,
+          handleSaveAs: _saveFileAs,
+          handleShare: _shareText,
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.folder_open, color: theme.textColor),
-            tooltip: 'Open File',
-            onPressed: _openFile,
-          ),
-          IconButton(
-            icon: Icon(Icons.save, color: theme.textColor),
-            tooltip: 'Save File',
-            onPressed: _saveFile,
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: theme.textColor),
-            color: theme.surfaceColor,
-            onSelected: (value) {
-              switch (value) {
-                case 'new':
-                  _newFile();
-                  break;
-                case 'save_as':
-                  _saveFileAs();
-                  break;
-                case 'share':
-                  _shareText();
-                  break;
-                case 'qr_show':
-                  _showQRCode();
-                  break;
-                case 'qr_scan':
-                  _scanQRCode();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'new',
-                child: Row(
-                  children: [
-                    Icon(Icons.note_add, color: theme.textColor),
-                    const SizedBox(width: 12),
-                    Text('New File', style: TextStyle(color: theme.textColor)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'save_as',
-                child: Row(
-                  children: [
-                    Icon(Icons.save_as, color: theme.textColor),
-                    const SizedBox(width: 12),
-                    Text('Save As', style: TextStyle(color: theme.textColor)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'share',
-                child: Row(
-                  children: [
-                    Icon(Icons.share, color: theme.textColor),
-                    const SizedBox(width: 12),
-                    Text('Share', style: TextStyle(color: theme.textColor)),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'qr_show',
-                child: Row(
-                  children: [
-                    Icon(Icons.qr_code, color: theme.textColor),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Show QR Code',
-                      style: TextStyle(color: theme.textColor),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'qr_scan',
-                child: Row(
-                  children: [
-                    Icon(Icons.qr_code_scanner, color: theme.textColor),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Scan QR Code',
-                      style: TextStyle(color: theme.textColor),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
           IconButton(
             icon: Icon(Icons.settings, color: theme.textColor),
             tooltip: 'Settings',
@@ -1214,12 +1126,96 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       ),
       body: Column(
         children: [
+          // Tab bar
+          Container(
+            height: 48,
+            color: theme.surfaceColor,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: _tabs.length,
+              itemBuilder: (context, index) {
+                final tab = _tabs[index];
+                final isSelected = index == _currentTabIndex;
+
+                return Tooltip(
+                  message: tab.filePath ?? 'Untitled',
+                  child: InkWell(
+                    onTap: () => _switchTab(index),
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 120,
+                        maxWidth: 200,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? theme.backgroundColor
+                            : theme.surfaceColor,
+                        border: Border(
+                          bottom: BorderSide(
+                            color: isSelected
+                                ? theme.accentColor
+                                : Colors.transparent,
+                            width: 2,
+                          ),
+                          right: BorderSide(
+                            color:
+                                theme.secondaryTextColor.withValues(alpha: 0.2),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              tab.fileName,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? theme.textColor
+                                    : theme.secondaryTextColor,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                          if (tab.hasUnsavedChanges)
+                            Container(
+                              margin: const EdgeInsets.only(left: 4),
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: theme.accentColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => _closeTab(index),
+                            child: Icon(
+                              Icons.close,
+                              size: 16,
+                              color: theme.secondaryTextColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Editor
           Expanded(
             child: Container(
               color: theme.backgroundColor,
               padding: const EdgeInsets.all(16),
               child: TextField(
-                controller: _textController,
+                controller: _currentTab.controller,
                 style: _getTextStyle(),
                 maxLines: null,
                 expands: true,
@@ -1238,19 +1234,270 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       ),
     );
   }
+}
 
-  Widget _buildToolbarButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-    required CustomTheme theme,
-  }) {
-    return IconButton(
-      icon: Icon(icon, color: theme.textColor, size: 20),
-      tooltip: tooltip,
-      onPressed: onPressed,
-      padding: const EdgeInsets.all(8),
-      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+class SettingsPanelScreen extends StatefulWidget {
+  final CustomTheme theme;
+  final List<CustomTheme> themes;
+  final int currentThemeIndex;
+  final String selectedFont;
+  final double fontSize;
+  final FontWeight fontWeight;
+  final Map<String, FontWeight> fontWeights;
+  final List<String> availableFonts;
+  final Function(int) onThemeChanged;
+  final Function(String) onFontChanged;
+  final Function(FontWeight) onFontWeightChanged;
+  final Function(double) onFontSizeChanged;
+  final Function(CustomTheme) onThemeCreated;
+  final VoidCallback onShowThemePicker;
+
+  const SettingsPanelScreen({
+    super.key,
+    required this.theme,
+    required this.themes,
+    required this.currentThemeIndex,
+    required this.selectedFont,
+    required this.fontSize,
+    required this.fontWeight,
+    required this.fontWeights,
+    required this.availableFonts,
+    required this.onThemeChanged,
+    required this.onFontChanged,
+    required this.onFontWeightChanged,
+    required this.onFontSizeChanged,
+    required this.onThemeCreated,
+    required this.onShowThemePicker,
+  });
+
+  @override
+  State<SettingsPanelScreen> createState() => _SettingsPanelScreenState();
+}
+
+class _SettingsPanelScreenState extends State<SettingsPanelScreen> {
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: true,
+      child: Scaffold(
+        backgroundColor: widget.theme.backgroundColor,
+        appBar: AppBar(
+          backgroundColor: widget.theme.surfaceColor,
+          title: Text(
+            'Settings',
+            style: TextStyle(color: widget.theme.textColor),
+          ),
+          iconTheme: IconThemeData(color: widget.theme.textColor),
+          elevation: 0,
+        ),
+        body: Row(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Theme Section
+                    Text(
+                      'Theme',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.theme.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildThemeGrid(),
+                    const SizedBox(height: 32),
+
+                    // Font Family Section
+                    Text(
+                      'Font Family',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.theme.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFontList(),
+                    const SizedBox(height: 32),
+
+                    // Font Weight Section
+                    Text(
+                      'Font Weight',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.theme.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFontWeightList(),
+                    const SizedBox(height: 32),
+
+                    // Font Size Section
+                    Text(
+                      'Font Size',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.theme.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildFontSizeSlider(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeGrid() {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: List.generate(
+        widget.themes.length,
+        (index) => GestureDetector(
+          onTap: () => widget.onThemeChanged(index),
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              color: widget.themes[index].backgroundColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: widget.currentThemeIndex == index
+                    ? widget.theme.accentColor
+                    : widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+                width: widget.currentThemeIndex == index ? 3 : 1,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: widget.themes[index].accentColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.themes[index].name,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: widget.themes[index].textColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFontList() {
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.theme.surfaceColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: widget.availableFonts.length,
+        itemBuilder: (context, index) {
+          final font = widget.availableFonts[index];
+          return ListTile(
+            title: Text(
+              font,
+              style: GoogleFonts.getFont(font, color: widget.theme.textColor),
+            ),
+            trailing: widget.selectedFont == font
+                ? Icon(Icons.check_circle, color: widget.theme.accentColor)
+                : null,
+            onTap: () => widget.onFontChanged(font),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFontWeightList() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: widget.fontWeights.entries.map((entry) {
+        final isSelected = widget.fontWeight == entry.value;
+        return GestureDetector(
+          onTap: () => widget.onFontWeightChanged(entry.value),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? widget.theme.accentColor
+                  : widget.theme.surfaceColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected
+                    ? widget.theme.accentColor
+                    : widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Text(
+              entry.key,
+              style: TextStyle(
+                color: isSelected ? Colors.white : widget.theme.textColor,
+                fontWeight: entry.value,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildFontSizeSlider() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${widget.fontSize.toStringAsFixed(0)} pt',
+          style: TextStyle(
+            fontSize: 16,
+            color: widget.theme.textColor,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SliderTheme(
+          data: SliderThemeData(
+            activeTrackColor: widget.theme.accentColor,
+            inactiveTrackColor:
+                widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+            thumbColor: widget.theme.accentColor,
+            overlayColor: widget.theme.accentColor.withValues(alpha: 0.2),
+          ),
+          child: Slider(
+            value: widget.fontSize,
+            min: 10,
+            max: 40,
+            divisions: 30,
+            onChanged: (value) => widget.onFontSizeChanged(value),
+          ),
+        ),
+      ],
     );
   }
 }
