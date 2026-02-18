@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:goatpad/responsive_layout.dart';
+import 'package:goatpad/share_dialog.dart';
+import 'package:goatpad/theme_page.dart';
 import 'package:goatpad/toolbar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
@@ -162,15 +165,24 @@ class EditorTab {
   final TextEditingController controller;
   String? filePath;
   bool hasUnsavedChanges;
+  DateTime? lastModified;
+  StreamSubscription<FileSystemEvent>? fileWatcher;
 
   EditorTab({
     required this.id,
     required this.controller,
     this.filePath,
     this.hasUnsavedChanges = false,
+    this.lastModified,
+    this.fileWatcher,
   });
 
-  String get fileName => filePath?.split('/').last ?? 'Untitled';
+  String get fileName => filePath?.split(Platform.pathSeparator).last ?? 'Untitled';
+
+  void dispose() {
+    controller.dispose();
+    fileWatcher?.cancel();
+  }
 }
 
 class TextEditorScreen extends StatefulWidget {
@@ -237,14 +249,14 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   @override
   void dispose() {
     for (var tab in _tabs) {
-      tab.controller.dispose();
+      tab.dispose();
     }
     super.dispose();
   }
 
   EditorTab get _currentTab => _tabs[_currentTabIndex];
 
-  void _createNewTab({String? filePath, String? content}) {
+  void _createNewTab({String? filePath, String? content, DateTime? lastModified}) {
     final controller = TextEditingController(text: content ?? '');
 
     final tab = EditorTab(
@@ -252,6 +264,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       controller: controller,
       filePath: filePath,
       hasUnsavedChanges: false,
+      lastModified: lastModified,
     );
 
     setState(() {
@@ -266,6 +279,108 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         _onTextChanged(tabIndex);
       }
     });
+
+    // Set up file watching if we have a file path
+    if (filePath != null && !kIsWeb) {
+      _setupFileWatcher(tab);
+    }
+  }
+
+  void _setupFileWatcher(EditorTab tab) {
+    if (tab.filePath == null || kIsWeb) return;
+
+    final file = File(tab.filePath!);
+    if (!file.existsSync()) return;
+
+    tab.fileWatcher?.cancel();
+
+    try {
+      final directory = file.parent;
+      tab.fileWatcher = directory.watch().listen((event) {
+        if (event.path == tab.filePath) {
+          if (event is FileSystemModifyEvent || event is FileSystemCreateEvent) {
+            _handleExternalFileChange(tab);
+          }
+        }
+      });
+    } catch (e) {
+      // File watching not supported on this platform
+      debugPrint('File watching not supported: $e');
+    }
+  }
+
+  Future<void> _handleExternalFileChange(EditorTab tab) async {
+    if (tab.filePath == null) return;
+
+    final file = File(tab.filePath!);
+    if (!file.existsSync()) return;
+
+    final fileStat = await file.stat();
+
+    // Only reload if the file was modified after our last known modification
+    if (tab.lastModified != null && fileStat.modified.isAfter(tab.lastModified!)) {
+      final content = await file.readAsString();
+
+      // Check if content actually changed
+      if (content != tab.controller.text) {
+        if (mounted) {
+          // Show dialog asking if user wants to reload
+          final shouldReload = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: _themes[_currentThemeIndex].surfaceColor,
+              title: Text(
+                'File Changed',
+                style: TextStyle(color: _themes[_currentThemeIndex].textColor),
+              ),
+              content: Text(
+                '${tab.fileName} has been modified externally. Do you want to reload it?',
+                style: TextStyle(color: _themes[_currentThemeIndex].secondaryTextColor),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text('Keep Mine', style: TextStyle(color: _themes[_currentThemeIndex].secondaryTextColor)),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text('Reload', style: TextStyle(color: _themes[_currentThemeIndex].accentColor)),
+                ),
+              ],
+            ),
+          );
+
+          if (shouldReload == true && mounted) {
+            setState(() {
+              tab.controller.text = content;
+              tab.lastModified = fileStat.modified;
+              tab.hasUnsavedChanges = false;
+            });
+          }
+        }
+      }
+
+      tab.lastModified = fileStat.modified;
+    }
+  }
+
+  void _reorderTabs(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) {
+        newIndex -= 1;
+      }
+      final tab = _tabs.removeAt(oldIndex);
+      _tabs.insert(newIndex, tab);
+
+      // Update current tab index if necessary
+      if (_currentTabIndex == oldIndex) {
+        _currentTabIndex = newIndex;
+      } else if (_currentTabIndex > oldIndex && _currentTabIndex <= newIndex) {
+        _currentTabIndex--;
+      } else if (_currentTabIndex < oldIndex && _currentTabIndex >= newIndex) {
+        _currentTabIndex++;
+      }
+    });
   }
 
   void _closeTab(int index) async {
@@ -275,7 +390,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     }
 
     setState(() {
-      _tabs[index].controller.dispose();
+      _tabs[index].dispose();
       _tabs.removeAt(index);
 
       if (_tabs.isEmpty) {
@@ -364,8 +479,9 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
       final file = File(filePath);
       final content = await file.readAsString();
+      final fileStat = await file.stat();
 
-      _createNewTab(filePath: filePath, content: content);
+      _createNewTab(filePath: filePath, content: content, lastModified: fileStat.modified);
       _showSnackBar('File opened successfully');
     }
   }
@@ -374,7 +490,11 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     if (_currentTab.filePath != null) {
       final file = File(_currentTab.filePath!);
       await file.writeAsString(_currentTab.controller.text);
-      setState(() => _currentTab.hasUnsavedChanges = false);
+      final fileStat = await file.stat();
+      setState(() {
+        _currentTab.hasUnsavedChanges = false;
+        _currentTab.lastModified = fileStat.modified;
+      });
       _showSnackBar('File saved successfully');
     } else {
       await _saveFileAs();
@@ -392,11 +512,18 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     if (path != null) {
       final file = File(path);
       await file.writeAsString(_currentTab.controller.text);
+      final fileStat = await file.stat();
 
       setState(() {
         _currentTab.filePath = path;
         _currentTab.hasUnsavedChanges = false;
+        _currentTab.lastModified = fileStat.modified;
       });
+
+      // Set up file watching for the newly saved file
+      if (!kIsWeb) {
+        _setupFileWatcher(_currentTab);
+      }
 
       _showSnackBar('File saved successfully');
     }
@@ -438,39 +565,14 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     );
   }
 
-  void _showQRCode() {
+  void _showShareDialog() {
     final theme = _themes[_currentThemeIndex];
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.surfaceColor,
-        title: Text(
-          'Share via QR Code',
-          style: TextStyle(color: theme.textColor),
-        ),
-        content: SizedBox(
-          width: 300,
-          height: 300,
-          child: _currentTab.controller.text.isEmpty
-              ? Center(
-                  child: Text(
-                    'No text to share',
-                    style: TextStyle(color: theme.secondaryTextColor),
-                  ),
-                )
-              : QrImageView(
-                  data: _currentTab.controller.text,
-                  version: QrVersions.auto,
-                  size: 280,
-                  backgroundColor: Colors.white,
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: TextStyle(color: theme.accentColor)),
-          ),
-        ],
+      builder: (context) => ShareDialog(
+        theme: theme,
+        text: _currentTab.controller.text,
+        onScanQR: _scanQRCode,
       ),
     );
   }
@@ -492,613 +594,49 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     );
   }
 
-  void _shareText() {
-    if (_currentTab.controller.text.isNotEmpty) {
-      Share.share(_currentTab.controller.text);
-    }
-  }
-
-  void _showFontPicker() {
-    final theme = _themes[_currentThemeIndex];
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.surfaceColor,
-        title: Text('Select Font', style: TextStyle(color: theme.textColor)),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: ListView.builder(
-            itemCount: _availableFonts.length,
-            itemBuilder: (context, index) {
-              final font = _availableFonts[index];
-              return ListTile(
-                title: Text(
-                  font,
-                  style: GoogleFonts.getFont(font, color: theme.textColor),
-                ),
-                trailing: _selectedFont == font
-                    ? Icon(Icons.check_circle, color: theme.accentColor)
-                    : null,
-                onTap: () {
-                  setState(() => _selectedFont = font);
-                  _saveSettings();
-                  Navigator.pop(context);
-                },
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showFontWeightPicker() {
-    final theme = _themes[_currentThemeIndex];
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.surfaceColor,
-        title: Text(
-          'Select Font Weight',
-          style: TextStyle(color: theme.textColor),
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _fontWeights.length,
-            itemBuilder: (context, index) {
-              final key = _fontWeights.keys.elementAt(index);
-              return ListTile(
-                title: Text(key, style: TextStyle(color: theme.textColor)),
-                trailing: _fontWeight == _fontWeights[key]
-                    ? Icon(Icons.check_circle, color: theme.accentColor)
-                    : null,
-                onTap: () {
-                  setState(() => _fontWeight = _fontWeights[key]!);
-                  _saveSettings();
-                  Navigator.pop(context);
-                },
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showThemePicker() {
-    final theme = _themes[_currentThemeIndex];
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.surfaceColor,
-        title: Text('Select Theme', style: TextStyle(color: theme.textColor)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _themes.length,
-            itemBuilder: (context, index) {
-              return ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: _themes[index].backgroundColor,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: theme.secondaryTextColor.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: _themes[index].accentColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ),
-                title: Text(
-                  _themes[index].name,
-                  style: TextStyle(color: theme.textColor),
-                ),
-                trailing: _currentThemeIndex == index
-                    ? Icon(Icons.check_circle, color: theme.accentColor)
-                    : null,
-                onTap: () {
-                  setState(() => _currentThemeIndex = index);
-                  _saveSettings();
-                  Navigator.pop(context);
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showCreateThemeDialog();
-            },
-            child: Text(
-              'Create Custom',
-              style: TextStyle(color: theme.accentColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showCreateThemeDialog() {
-    final theme = _themes[_currentThemeIndex];
-    final nameController = TextEditingController();
-    Color backgroundColor = theme.backgroundColor;
-    Color surfaceColor = theme.surfaceColor;
-    Color primaryColor = theme.primaryColor;
-    Color textColor = theme.textColor;
-    Color secondaryTextColor = theme.secondaryTextColor;
-    Color accentColor = theme.accentColor;
-    Brightness brightness = theme.brightness;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: theme.surfaceColor,
-          title: Text(
-            'Create Custom Theme',
-            style: TextStyle(color: theme.textColor),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  style: TextStyle(color: theme.textColor),
-                  decoration: InputDecoration(
-                    labelText: 'Theme Name',
-                    labelStyle: TextStyle(color: theme.secondaryTextColor),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: theme.secondaryTextColor),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildColorPicker('Background', backgroundColor, (color) {
-                  setDialogState(() => backgroundColor = color);
-                }, theme),
-                _buildColorPicker('Surface', surfaceColor, (color) {
-                  setDialogState(() => surfaceColor = color);
-                }, theme),
-                _buildColorPicker('Primary', primaryColor, (color) {
-                  setDialogState(() => primaryColor = color);
-                }, theme),
-                _buildColorPicker('Text', textColor, (color) {
-                  setDialogState(() => textColor = color);
-                }, theme),
-                _buildColorPicker('Secondary Text', secondaryTextColor, (
-                  color,
-                ) {
-                  setDialogState(() => secondaryTextColor = color);
-                }, theme),
-                _buildColorPicker('Accent', accentColor, (color) {
-                  setDialogState(() => accentColor = color);
-                }, theme),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(color: theme.secondaryTextColor),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                if (nameController.text.isNotEmpty) {
-                  final newTheme = CustomTheme(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: nameController.text,
-                    backgroundColor: backgroundColor,
-                    surfaceColor: surfaceColor,
-                    primaryColor: primaryColor,
-                    textColor: textColor,
-                    secondaryTextColor: secondaryTextColor,
-                    accentColor: accentColor,
-                    brightness: brightness,
-                  );
-
-                  setState(() {
-                    _themes.add(newTheme);
-                    _currentThemeIndex = _themes.length - 1;
-                  });
-
-                  _saveSettings();
-                  Navigator.pop(context);
-                  _showSnackBar('Custom theme created');
-                }
-              },
-              child: Text('Create', style: TextStyle(color: theme.accentColor)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildColorPicker(
-    String label,
-    Color currentColor,
-    Function(Color) onColorChanged,
-    CustomTheme theme,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: theme.textColor)),
-          GestureDetector(
-            onTap: () async {
-              final color = await _showColorPickerDialog(currentColor, theme);
-              if (color != null) {
-                onColorChanged(color);
-              }
-            },
-            child: Container(
-              width: 50,
-              height: 36,
-              decoration: BoxDecoration(
-                color: currentColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: theme.secondaryTextColor),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<Color?> _showColorPickerDialog(
-    Color currentColor,
-    CustomTheme theme,
-  ) async {
-    Color selectedColor = currentColor;
-
-    return showDialog<Color>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: theme.surfaceColor,
-        title: Text('Pick a Color', style: TextStyle(color: theme.textColor)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Colors.red,
-                  Colors.pink,
-                  Colors.purple,
-                  Colors.deepPurple,
-                  Colors.indigo,
-                  Colors.blue,
-                  Colors.lightBlue,
-                  Colors.cyan,
-                  Colors.teal,
-                  Colors.green,
-                  Colors.lightGreen,
-                  Colors.lime,
-                  Colors.yellow,
-                  Colors.amber,
-                  Colors.orange,
-                  Colors.deepOrange,
-                  Colors.brown,
-                  Colors.grey,
-                  Colors.blueGrey,
-                  Colors.black,
-                  Colors.white,
-                ]
-                    .map(
-                      (color) => GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context, color);
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: color == selectedColor
-                                  ? theme.accentColor
-                                  : theme.secondaryTextColor,
-                              width: color == selectedColor ? 3 : 1,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showSettingsPanel() {
-    final theme = _themes[_currentThemeIndex];
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isWideScreen = screenWidth > 900;
-
-    if (isWideScreen) {
-      // Show as a side panel on wide screens
-      Navigator.push(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              SettingsPanelScreen(
-            theme: theme,
-            themes: _themes,
-            currentThemeIndex: _currentThemeIndex,
-            selectedFont: _selectedFont,
-            fontSize: _fontSize,
-            fontWeight: _fontWeight,
-            fontWeights: _fontWeights,
-            availableFonts: _availableFonts,
-            onThemeChanged: (index) {
-              setState(() => _currentThemeIndex = index);
-              _saveSettings();
-            },
-            onFontChanged: (font) {
-              setState(() => _selectedFont = font);
-              _saveSettings();
-            },
-            onFontWeightChanged: (weight) {
-              setState(() => _fontWeight = weight);
-              _saveSettings();
-            },
-            onFontSizeChanged: (size) {
-              setState(() => _fontSize = size);
-              _saveSettings();
-            },
-            onThemeCreated: (newTheme) {
+  void _openThemePage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ThemePage(
+          currentTheme: _themes[_currentThemeIndex],
+          themes: _themes,
+          currentThemeIndex: _currentThemeIndex,
+          onThemeChanged: (index) {
+            setState(() => _currentThemeIndex = index);
+            _saveSettings();
+          },
+          onThemeCreated: (newTheme) {
+            setState(() {
+              _themes.add(newTheme);
+              _currentThemeIndex = _themes.length - 1;
+            });
+            _saveSettings();
+            _showSnackBar('Custom theme created');
+          },
+          onThemeDeleted: (index) {
+            if (index < _themes.length && index >= CustomTheme.defaultThemes.length) {
               setState(() {
-                _themes.add(newTheme);
-                _currentThemeIndex = _themes.length - 1;
+                _themes.removeAt(index);
+                if (_currentThemeIndex >= _themes.length) {
+                  _currentThemeIndex = _themes.length - 1;
+                }
               });
               _saveSettings();
-            },
-            onShowThemePicker: _showThemePicker,
-          ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(1.0, 0.0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            );
+              _showSnackBar('Theme deleted');
+            }
           },
-        ),
-      );
-    } else {
-      // Show as bottom sheet on small screens
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: theme.surfaceColor,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (context) => StatefulBuilder(
-          builder: (context, setModalState) => Container(
-            padding: const EdgeInsets.all(24),
-            height: MediaQuery.of(context).size.height * 0.75,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Settings',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: theme.textColor,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: theme.textColor),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Expanded(
-                  child: ListView(
-                    children: [
-                      _buildSettingsTile(
-                        icon: Icons.font_download,
-                        title: 'Font Family',
-                        subtitle: _selectedFont,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showFontPicker();
-                        },
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSettingsTile(
-                        icon: Icons.format_bold,
-                        title: 'Font Weight',
-                        subtitle: _fontWeights.entries
-                            .firstWhere((e) => e.value == _fontWeight)
-                            .key,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showFontWeightPicker();
-                        },
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: theme.backgroundColor,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.format_size,
-                                  color: theme.accentColor,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Font Size',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500,
-                                          color: theme.textColor,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${_fontSize.toStringAsFixed(0)} pt',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: theme.secondaryTextColor,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SliderTheme(
-                              data: SliderThemeData(
-                                activeTrackColor: theme.accentColor,
-                                inactiveTrackColor: theme.secondaryTextColor
-                                    .withValues(alpha: 0.3),
-                                thumbColor: theme.accentColor,
-                                overlayColor: theme.accentColor.withValues(
-                                  alpha: 0.2,
-                                ),
-                              ),
-                              child: Slider(
-                                value: _fontSize,
-                                min: 10,
-                                max: 40,
-                                divisions: 30,
-                                onChanged: (value) {
-                                  setState(() => _fontSize = value);
-                                  setModalState(() => _fontSize = value);
-                                  _saveSettings();
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildSettingsTile(
-                        icon: Icons.palette,
-                        title: 'Theme',
-                        subtitle: _themes[_currentThemeIndex].name,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showThemePicker();
-                        },
-                        theme: theme,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-  Widget _buildSettingsTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    required CustomTheme theme,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: theme.accentColor, size: 24),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: theme.textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: theme.secondaryTextColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: theme.secondaryTextColor),
-          ],
         ),
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
     final theme = _themes[_currentThemeIndex];
+    final isMobile = ResponsiveLayout.isMobile(context);
+
     return Scaffold(
       backgroundColor: theme.backgroundColor,
       appBar: AppBar(
@@ -1110,98 +648,167 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           textController: _currentTab.controller,
           handleNewFile: _newFile,
           handleFileOpen: _openFile,
-          handleQR: _showQRCode,
-          handleQRScan: _scanQRCode,
           handleSave: _saveFile,
           handleSaveAs: _saveFileAs,
-          handleShare: _shareText,
+          handleShare: _showShareDialog,
+          selectedFont: _selectedFont,
+          fontWeight: _fontWeight,
+          fontSize: _fontSize,
+          availableFonts: _availableFonts,
+          fontWeights: _fontWeights,
+          onFontChanged: (font) {
+            setState(() => _selectedFont = font);
+            _saveSettings();
+          },
+          onFontWeightChanged: (weight) {
+            setState(() => _fontWeight = weight);
+            _saveSettings();
+          },
+          onFontSizeChanged: (size) {
+            setState(() => _fontSize = size);
+            _saveSettings();
+          },
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.settings, color: theme.textColor),
-            tooltip: 'Settings',
-            onPressed: _showSettingsPanel,
+            icon: Icon(Icons.palette_outlined, color: theme.textColor),
+            tooltip: 'Themes',
+            onPressed: _openThemePage,
           ),
+          if (!isMobile)
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: theme.textColor),
+              color: theme.surfaceColor,
+              onSelected: (value) {
+                switch (value) {
+                  case 'about':
+                    _showAboutDialog();
+                    break;
+                  case 'help':
+                    _showHelpDialog();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'about',
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: theme.textColor, size: 20),
+                      const SizedBox(width: 12),
+                      Text('About', style: TextStyle(color: theme.textColor)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'help',
+                  child: Row(
+                    children: [
+                      Icon(Icons.help_outline, color: theme.textColor, size: 20),
+                      const SizedBox(width: 12),
+                      Text('Help', style: TextStyle(color: theme.textColor)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       body: Column(
         children: [
-          // Tab bar
+          // Reorderable Tab bar
           Container(
             height: 48,
             color: theme.surfaceColor,
-            child: ListView.builder(
+            child: ReorderableListView.builder(
               scrollDirection: Axis.horizontal,
+              buildDefaultDragHandles: false,
               itemCount: _tabs.length,
+              onReorder: _reorderTabs,
+              proxyDecorator: (child, index, animation) {
+                return Material(
+                  color: theme.backgroundColor,
+                  elevation: 4,
+                  child: child,
+                );
+              },
               itemBuilder: (context, index) {
                 final tab = _tabs[index];
                 final isSelected = index == _currentTabIndex;
 
-                return Tooltip(
-                  message: tab.filePath ?? 'Untitled',
-                  child: InkWell(
-                    onTap: () => _switchTab(index),
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minWidth: 120,
-                        maxWidth: 200,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? theme.backgroundColor
-                            : theme.surfaceColor,
-                        border: Border(
-                          bottom: BorderSide(
-                            color: isSelected
-                                ? theme.accentColor
-                                : Colors.transparent,
-                            width: 2,
-                          ),
-                          right: BorderSide(
-                            color:
-                                theme.secondaryTextColor.withValues(alpha: 0.2),
-                            width: 1,
+                return ReorderableDragStartListener(
+                  key: ValueKey(tab.id),
+                  index: index,
+                  child: Tooltip(
+                    message: tab.filePath ?? 'Untitled',
+                    child: InkWell(
+                      onTap: () => _switchTab(index),
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 120,
+                          maxWidth: 200,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? theme.backgroundColor
+                              : theme.surfaceColor,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: isSelected
+                                  ? theme.accentColor
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                            right: BorderSide(
+                              color:
+                                  theme.secondaryTextColor.withValues(alpha: 0.2),
+                              width: 1,
+                            ),
                           ),
                         ),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              tab.fileName,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? theme.textColor
-                                    : theme.secondaryTextColor,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                tab.fileName,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? theme.textColor
+                                      : theme.secondaryTextColor,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
                               ),
                             ),
-                          ),
-                          if (tab.hasUnsavedChanges)
-                            Container(
-                              margin: const EdgeInsets.only(left: 4),
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: theme.accentColor,
-                                shape: BoxShape.circle,
+                            if (tab.hasUnsavedChanges)
+                              Container(
+                                margin: const EdgeInsets.only(left: 4),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: theme.accentColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: () => _closeTab(index),
+                              borderRadius: BorderRadius.circular(10),
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: theme.secondaryTextColor,
+                                ),
                               ),
                             ),
-                          const SizedBox(width: 8),
-                          InkWell(
-                            onTap: () => _closeTab(index),
-                            child: Icon(
-                              Icons.close,
-                              size: 16,
-                              color: theme.secondaryTextColor,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1228,6 +835,404 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                   ),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+      // Mobile Bottom Navigation
+      bottomNavigationBar: isMobile
+          ? _buildMobileBottomBar(theme)
+          : null,
+    );
+  }
+
+  Widget _buildMobileBottomBar(CustomTheme theme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.surfaceColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildMobileNavItem(
+                icon: Icons.note_add,
+                label: 'New',
+                onTap: _newFile,
+                theme: theme,
+              ),
+              _buildMobileNavItem(
+                icon: Icons.folder_open,
+                label: 'Open',
+                onTap: _openFile,
+                theme: theme,
+              ),
+              _buildMobileNavItem(
+                icon: Icons.save,
+                label: 'Save',
+                onTap: _saveFile,
+                theme: theme,
+              ),
+              _buildMobileNavItem(
+                icon: Icons.share,
+                label: 'Share',
+                onTap: _showShareDialog,
+                theme: theme,
+              ),
+              _buildMobileNavItem(
+                icon: Icons.more_horiz,
+                label: 'More',
+                onTap: () => _showMobileMoreMenu(theme),
+                theme: theme,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileNavItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required CustomTheme theme,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: theme.textColor, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: theme.secondaryTextColor,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showMobileMoreMenu(CustomTheme theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.secondaryTextColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Icon(Icons.save_as, color: theme.textColor),
+                title: Text('Save As', style: TextStyle(color: theme.textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _saveFileAs();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.qr_code_scanner, color: theme.textColor),
+                title: Text('Scan QR Code', style: TextStyle(color: theme.textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _scanQRCode();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.palette, color: theme.textColor),
+                title: Text('Themes', style: TextStyle(color: theme.textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openThemePage();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.text_fields, color: theme.textColor),
+                title: Text('Font Settings', style: TextStyle(color: theme.textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showMobileFontSettings(theme);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: Icon(Icons.info_outline, color: theme.textColor),
+                title: Text('About', style: TextStyle(color: theme.textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAboutDialog();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.help_outline, color: theme.textColor),
+                title: Text('Help', style: TextStyle(color: theme.textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showHelpDialog();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMobileFontSettings(CustomTheme theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.surfaceColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.secondaryTextColor.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Font Settings',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: theme.textColor,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Font Size: ${_fontSize.toInt()} pt',
+                  style: TextStyle(color: theme.textColor),
+                ),
+                SliderTheme(
+                  data: SliderThemeData(
+                    activeTrackColor: theme.accentColor,
+                    inactiveTrackColor: theme.secondaryTextColor.withValues(alpha: 0.3),
+                    thumbColor: theme.accentColor,
+                  ),
+                  child: Slider(
+                    value: _fontSize,
+                    min: 10,
+                    max: 40,
+                    divisions: 30,
+                    onChanged: (value) {
+                      setState(() => _fontSize = value);
+                      setModalState(() {});
+                      _saveSettings();
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Font Weight',
+                  style: TextStyle(color: theme.textColor),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _fontWeights.entries.map((entry) {
+                    final isSelected = _fontWeight == entry.value;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() => _fontWeight = entry.value);
+                        setModalState(() {});
+                        _saveSettings();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? theme.accentColor : theme.backgroundColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected ? theme.accentColor : theme.secondaryTextColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Text(
+                          entry.key,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : theme.textColor,
+                            fontWeight: entry.value,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Font Family',
+                  style: TextStyle(color: theme.textColor),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: _availableFonts.length,
+                    itemBuilder: (context, index) {
+                      final font = _availableFonts[index];
+                      final isSelected = _selectedFont == font;
+                      return ListTile(
+                        title: Text(
+                          font,
+                          style: GoogleFonts.getFont(font, color: theme.textColor),
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle, color: theme.accentColor)
+                            : null,
+                        onTap: () {
+                          setState(() => _selectedFont = font);
+                          setModalState(() {});
+                          _saveSettings();
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    final theme = _themes[_currentThemeIndex];
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.surfaceColor,
+        title: Row(
+          children: [
+            Image.asset('goatpad-logo.png', width: 40, height: 40),
+            const SizedBox(width: 12),
+            Text('GoatPad', style: TextStyle(color: theme.textColor)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'A simple, elegant text editor',
+              style: TextStyle(color: theme.secondaryTextColor),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Version 1.0.0',
+              style: TextStyle(color: theme.secondaryTextColor, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close', style: TextStyle(color: theme.accentColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog() {
+    final theme = _themes[_currentThemeIndex];
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.surfaceColor,
+        title: Text('Help', style: TextStyle(color: theme.textColor)),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHelpItem('New File', 'Create a new empty document', theme),
+              _buildHelpItem('Open File', 'Open an existing text file', theme),
+              _buildHelpItem('Save', 'Save the current document', theme),
+              _buildHelpItem('Share', 'Share text via QR code or other apps', theme),
+              _buildHelpItem('Themes', 'Customize the app appearance', theme),
+              _buildHelpItem('Tabs', 'Drag tabs to reorder them', theme),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close', style: TextStyle(color: theme.accentColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpItem(String title, String description, CustomTheme theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: theme.textColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            description,
+            style: TextStyle(
+              color: theme.secondaryTextColor,
+              fontSize: 13,
             ),
           ),
         ],
