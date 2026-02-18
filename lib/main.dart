@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:goatpad/responsive_layout.dart';
 import 'package:goatpad/share_dialog.dart';
 import 'package:goatpad/theme_page.dart';
@@ -177,7 +178,8 @@ class EditorTab {
     this.fileWatcher,
   });
 
-  String get fileName => filePath?.split(Platform.pathSeparator).last ?? 'Untitled';
+  String get fileName =>
+      filePath?.split(Platform.pathSeparator).last ?? 'Untitled';
 
   void dispose() {
     controller.dispose();
@@ -256,7 +258,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
   EditorTab get _currentTab => _tabs[_currentTabIndex];
 
-  void _createNewTab({String? filePath, String? content, DateTime? lastModified}) {
+  void _createNewTab(
+      {String? filePath, String? content, DateTime? lastModified}) {
     final controller = TextEditingController(text: content ?? '');
 
     final tab = EditorTab(
@@ -298,7 +301,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       final directory = file.parent;
       tab.fileWatcher = directory.watch().listen((event) {
         if (event.path == tab.filePath) {
-          if (event is FileSystemModifyEvent || event is FileSystemCreateEvent) {
+          if (event is FileSystemModifyEvent ||
+              event is FileSystemCreateEvent) {
             _handleExternalFileChange(tab);
           }
         }
@@ -318,7 +322,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     final fileStat = await file.stat();
 
     // Only reload if the file was modified after our last known modification
-    if (tab.lastModified != null && fileStat.modified.isAfter(tab.lastModified!)) {
+    if (tab.lastModified != null &&
+        fileStat.modified.isAfter(tab.lastModified!)) {
       final content = await file.readAsString();
 
       // Check if content actually changed
@@ -335,16 +340,22 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               ),
               content: Text(
                 '${tab.fileName} has been modified externally. Do you want to reload it?',
-                style: TextStyle(color: _themes[_currentThemeIndex].secondaryTextColor),
+                style: TextStyle(
+                    color: _themes[_currentThemeIndex].secondaryTextColor),
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: Text('Keep Mine', style: TextStyle(color: _themes[_currentThemeIndex].secondaryTextColor)),
+                  child: Text('Keep Mine',
+                      style: TextStyle(
+                          color:
+                              _themes[_currentThemeIndex].secondaryTextColor)),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: Text('Reload', style: TextStyle(color: _themes[_currentThemeIndex].accentColor)),
+                  child: Text('Reload',
+                      style: TextStyle(
+                          color: _themes[_currentThemeIndex].accentColor)),
                 ),
               ],
             ),
@@ -481,7 +492,10 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       final content = await file.readAsString();
       final fileStat = await file.stat();
 
-      _createNewTab(filePath: filePath, content: content, lastModified: fileStat.modified);
+      _createNewTab(
+          filePath: filePath,
+          content: content,
+          lastModified: fileStat.modified);
       _showSnackBar('File opened successfully');
     }
   }
@@ -615,7 +629,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             _showSnackBar('Custom theme created');
           },
           onThemeDeleted: (index) {
-            if (index < _themes.length && index >= CustomTheme.defaultThemes.length) {
+            if (index < _themes.length &&
+                index >= CustomTheme.defaultThemes.length) {
               setState(() {
                 _themes.removeAt(index);
                 if (_currentThemeIndex >= _themes.length) {
@@ -631,218 +646,232 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     final theme = _themes[_currentThemeIndex];
     final isMobile = ResponsiveLayout.isMobile(context);
 
-    return Scaffold(
-      backgroundColor: theme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: theme.surfaceColor,
-        elevation: 0,
-        toolbarHeight: 56,
-        title: Toolbar(
-          theme: theme,
-          textController: _currentTab.controller,
-          handleNewFile: _newFile,
-          handleFileOpen: _openFile,
-          handleSave: _saveFile,
-          handleSaveAs: _saveFileAs,
-          handleShare: _showShareDialog,
-          selectedFont: _selectedFont,
-          fontWeight: _fontWeight,
-          fontSize: _fontSize,
-          availableFonts: _availableFonts,
-          fontWeights: _fontWeights,
-          onFontChanged: (font) {
-            setState(() => _selectedFont = font);
-            _saveSettings();
-          },
-          onFontWeightChanged: (weight) {
-            setState(() => _fontWeight = weight);
-            _saveSettings();
-          },
-          onFontSizeChanged: (size) {
-            setState(() => _fontSize = size);
-            _saveSettings();
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.palette_outlined, color: theme.textColor),
-            tooltip: 'Themes',
-            onPressed: _openThemePage,
-          ),
-          if (!isMobile)
-            PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, color: theme.textColor),
-              color: theme.surfaceColor,
-              onSelected: (value) {
-                switch (value) {
-                  case 'about':
-                    _showAboutDialog();
-                    break;
-                  case 'help':
-                    _showHelpDialog();
-                    break;
-                }
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+            _saveFile,
+        const SingleActivator(LogicalKeyboardKey.keyS,
+            control: true, shift: true): _saveFileAs,
+        const SingleActivator(LogicalKeyboardKey.keyS, alt: true):
+            _showShareDialog,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: theme.backgroundColor,
+          appBar: AppBar(
+            backgroundColor: theme.surfaceColor,
+            elevation: 0,
+            toolbarHeight: 56,
+            title: Toolbar(
+              theme: theme,
+              textController: _currentTab.controller,
+              handleNewFile: _newFile,
+              handleFileOpen: _openFile,
+              handleSave: _saveFile,
+              handleSaveAs: _saveFileAs,
+              handleShare: _showShareDialog,
+              selectedFont: _selectedFont,
+              fontWeight: _fontWeight,
+              fontSize: _fontSize,
+              availableFonts: _availableFonts,
+              fontWeights: _fontWeights,
+              onFontChanged: (font) {
+                setState(() => _selectedFont = font);
+                _saveSettings();
               },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'about',
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: theme.textColor, size: 20),
-                      const SizedBox(width: 12),
-                      Text('About', style: TextStyle(color: theme.textColor)),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'help',
-                  child: Row(
-                    children: [
-                      Icon(Icons.help_outline, color: theme.textColor, size: 20),
-                      const SizedBox(width: 12),
-                      Text('Help', style: TextStyle(color: theme.textColor)),
-                    ],
-                  ),
-                ),
-              ],
+              onFontWeightChanged: (weight) {
+                setState(() => _fontWeight = weight);
+                _saveSettings();
+              },
+              onFontSizeChanged: (size) {
+                setState(() => _fontSize = size);
+                _saveSettings();
+              },
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Reorderable Tab bar
-          Container(
-            height: 48,
-            color: theme.surfaceColor,
-            child: ReorderableListView.builder(
-              scrollDirection: Axis.horizontal,
-              buildDefaultDragHandles: false,
-              itemCount: _tabs.length,
-              onReorder: _reorderTabs,
-              proxyDecorator: (child, index, animation) {
-                return Material(
-                  color: theme.backgroundColor,
-                  elevation: 4,
-                  child: child,
-                );
-              },
-              itemBuilder: (context, index) {
-                final tab = _tabs[index];
-                final isSelected = index == _currentTabIndex;
+            actions: [
+              IconButton(
+                icon: Icon(Icons.palette_outlined, color: theme.textColor),
+                tooltip: 'Themes',
+                onPressed: _openThemePage,
+              ),
+              if (!isMobile)
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert, color: theme.textColor),
+                  color: theme.surfaceColor,
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'about':
+                        _showAboutDialog();
+                        break;
+                      case 'help':
+                        _showHelpDialog();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'about',
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline,
+                              color: theme.textColor, size: 20),
+                          const SizedBox(width: 12),
+                          Text('About',
+                              style: TextStyle(color: theme.textColor)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'help',
+                      child: Row(
+                        children: [
+                          Icon(Icons.help_outline,
+                              color: theme.textColor, size: 20),
+                          const SizedBox(width: 12),
+                          Text('Help',
+                              style: TextStyle(color: theme.textColor)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          body: Column(
+            children: [
+              // Reorderable Tab bar
+              Container(
+                height: 48,
+                color: theme.surfaceColor,
+                child: ReorderableListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  buildDefaultDragHandles: false,
+                  itemCount: _tabs.length,
+                  onReorder: _reorderTabs,
+                  proxyDecorator: (child, index, animation) {
+                    return Material(
+                      color: theme.backgroundColor,
+                      elevation: 4,
+                      child: child,
+                    );
+                  },
+                  itemBuilder: (context, index) {
+                    final tab = _tabs[index];
+                    final isSelected = index == _currentTabIndex;
 
-                return ReorderableDragStartListener(
-                  key: ValueKey(tab.id),
-                  index: index,
-                  child: Tooltip(
-                    message: tab.filePath ?? 'Untitled',
-                    child: InkWell(
-                      onTap: () => _switchTab(index),
-                      child: Container(
-                        constraints: const BoxConstraints(
-                          minWidth: 120,
-                          maxWidth: 200,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? theme.backgroundColor
-                              : theme.surfaceColor,
-                          border: Border(
-                            bottom: BorderSide(
-                              color: isSelected
-                                  ? theme.accentColor
-                                  : Colors.transparent,
-                              width: 2,
+                    return ReorderableDragStartListener(
+                      key: ValueKey(tab.id),
+                      index: index,
+                      child: Tooltip(
+                        message: tab.filePath ?? 'Untitled',
+                        child: InkWell(
+                          onTap: () => _switchTab(index),
+                          child: Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 120,
+                              maxWidth: 200,
                             ),
-                            right: BorderSide(
-                              color:
-                                  theme.secondaryTextColor.withValues(alpha: 0.2),
-                              width: 1,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? theme.backgroundColor
+                                  : theme.surfaceColor,
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: isSelected
+                                      ? theme.accentColor
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
+                                right: BorderSide(
+                                  color: theme.secondaryTextColor
+                                      .withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    tab.fileName,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? theme.textColor
+                                          : theme.secondaryTextColor,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                ),
+                                if (tab.hasUnsavedChanges)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 4),
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: theme.accentColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                const SizedBox(width: 8),
+                                InkWell(
+                                  onTap: () => _closeTab(index),
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(2),
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: theme.secondaryTextColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                tab.fileName,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? theme.textColor
-                                      : theme.secondaryTextColor,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                            if (tab.hasUnsavedChanges)
-                              Container(
-                                margin: const EdgeInsets.only(left: 4),
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: theme.accentColor,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            const SizedBox(width: 8),
-                            InkWell(
-                              onTap: () => _closeTab(index),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Padding(
-                                padding: const EdgeInsets.all(2),
-                                child: Icon(
-                                  Icons.close,
-                                  size: 16,
-                                  color: theme.secondaryTextColor,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // Editor
+              Expanded(
+                child: Container(
+                  color: theme.backgroundColor,
+                  padding: const EdgeInsets.all(16),
+                  child: TextField(
+                    controller: _currentTab.controller,
+                    style: _getTextStyle(),
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Start typing or open a file...',
+                      hintStyle: _getTextStyle().copyWith(
+                        color: theme.secondaryTextColor.withValues(alpha: 0.5),
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          // Editor
-          Expanded(
-            child: Container(
-              color: theme.backgroundColor,
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _currentTab.controller,
-                style: _getTextStyle(),
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: InputDecoration(
-                  border: InputBorder.none,
-                  hintText: 'Start typing or open a file...',
-                  hintStyle: _getTextStyle().copyWith(
-                    color: theme.secondaryTextColor.withValues(alpha: 0.5),
-                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+          // Mobile Bottom Navigation
+          bottomNavigationBar: isMobile ? _buildMobileBottomBar(theme) : null,
+        ),
       ),
-      // Mobile Bottom Navigation
-      bottomNavigationBar: isMobile
-          ? _buildMobileBottomBar(theme)
-          : null,
     );
   }
 
@@ -954,7 +983,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               const SizedBox(height: 16),
               ListTile(
                 leading: Icon(Icons.save_as, color: theme.textColor),
-                title: Text('Save As', style: TextStyle(color: theme.textColor)),
+                title:
+                    Text('Save As', style: TextStyle(color: theme.textColor)),
                 onTap: () {
                   Navigator.pop(context);
                   _saveFileAs();
@@ -962,7 +992,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               ),
               ListTile(
                 leading: Icon(Icons.qr_code_scanner, color: theme.textColor),
-                title: Text('Scan QR Code', style: TextStyle(color: theme.textColor)),
+                title: Text('Scan QR Code',
+                    style: TextStyle(color: theme.textColor)),
                 onTap: () {
                   Navigator.pop(context);
                   _scanQRCode();
@@ -978,7 +1009,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               ),
               ListTile(
                 leading: Icon(Icons.text_fields, color: theme.textColor),
-                title: Text('Font Settings', style: TextStyle(color: theme.textColor)),
+                title: Text('Font Settings',
+                    style: TextStyle(color: theme.textColor)),
                 onTap: () {
                   Navigator.pop(context);
                   _showMobileFontSettings(theme);
@@ -1054,7 +1086,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                 SliderTheme(
                   data: SliderThemeData(
                     activeTrackColor: theme.accentColor,
-                    inactiveTrackColor: theme.secondaryTextColor.withValues(alpha: 0.3),
+                    inactiveTrackColor:
+                        theme.secondaryTextColor.withValues(alpha: 0.3),
                     thumbColor: theme.accentColor,
                   ),
                   child: Slider(
@@ -1087,12 +1120,18 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                         _saveSettings();
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isSelected ? theme.accentColor : theme.backgroundColor,
+                          color: isSelected
+                              ? theme.accentColor
+                              : theme.backgroundColor,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isSelected ? theme.accentColor : theme.secondaryTextColor.withValues(alpha: 0.3),
+                            color: isSelected
+                                ? theme.accentColor
+                                : theme.secondaryTextColor
+                                    .withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(
@@ -1123,7 +1162,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                       return ListTile(
                         title: Text(
                           font,
-                          style: GoogleFonts.getFont(font, color: theme.textColor),
+                          style:
+                              GoogleFonts.getFont(font, color: theme.textColor),
                         ),
                         trailing: isSelected
                             ? Icon(Icons.check_circle, color: theme.accentColor)
@@ -1163,7 +1203,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'A simple, elegant text editor',
+              'The (allegedly) Greatest Of All Text editors',
               style: TextStyle(color: theme.secondaryTextColor),
             ),
             const SizedBox(height: 16),
@@ -1185,24 +1225,62 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
   void _showHelpDialog() {
     final theme = _themes[_currentThemeIndex];
+    final isDesktop = ResponsiveLayout.isDesktopOrTablet(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: theme.surfaceColor,
         title: Text('Help', style: TextStyle(color: theme.textColor)),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHelpItem('New File', 'Create a new empty document', theme),
-              _buildHelpItem('Open File', 'Open an existing text file', theme),
-              _buildHelpItem('Save', 'Save the current document', theme),
-              _buildHelpItem('Share', 'Share text via QR code or other apps', theme),
-              _buildHelpItem('Themes', 'Customize the app appearance', theme),
-              _buildHelpItem('Tabs', 'Drag tabs to reorder them', theme),
-            ],
-          ),
+        content: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.5,
+          width: MediaQuery.of(context).size.width * 0.6,
+          child: isDesktop
+              ? Row(
+            spacing: 48,
+                  children: [
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildHelpItem(
+                              'New File', 'Create a new empty document', theme),
+                          _buildHelpItem(
+                              'Open File', 'Open an existing text file', theme),
+                          _buildHelpItem(
+                              'Save', 'Save the current document', theme),
+                          _buildHelpItem('Share',
+                              'Share text via QR code or other apps', theme),
+                          _buildHelpItem(
+                              'Themes', 'Customize the app appearance', theme),
+                          _buildHelpItem(
+                              'Tabs', 'Drag tabs to reorder them', theme),
+                          const SizedBox(height: 16),
+                        ]),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Keyboard Shortcuts',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: theme.textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildShortcutItem('Ctrl + S', 'Save', theme),
+                        _buildShortcutItem(
+                            'Ctrl + Shift + S', 'Save As', theme),
+                        _buildShortcutItem('Alt + S', 'Share', theme),
+                        _buildShortcutItem('Ctrl + C', 'Copy', theme),
+                        _buildShortcutItem('Ctrl + X', 'Cut', theme),
+                        _buildShortcutItem('Ctrl + V', 'Paste', theme),
+                      ],
+                    )
+                  ],
+                )
+              : Column(),
         ),
         actions: [
           TextButton(
@@ -1230,6 +1308,43 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           const SizedBox(height: 2),
           Text(
             description,
+            style: TextStyle(
+              color: theme.secondaryTextColor,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShortcutItem(String shortcut, String action, CustomTheme theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.backgroundColor,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: theme.secondaryTextColor.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Text(
+              shortcut,
+              style: TextStyle(
+                color: theme.textColor,
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            action,
             style: TextStyle(
               color: theme.secondaryTextColor,
               fontSize: 13,

@@ -24,21 +24,38 @@ class ThemePage extends StatefulWidget {
 }
 
 class _ThemePageState extends State<ThemePage> {
+  late int _selectedThemeIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedThemeIndex = widget.currentThemeIndex;
+  }
+
+  CustomTheme get _currentDisplayTheme => widget.themes[_selectedThemeIndex];
+
+  void _handleThemeChanged(int index) {
+    setState(() {
+      _selectedThemeIndex = index;
+    });
+    widget.onThemeChanged(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: widget.currentTheme.backgroundColor,
+      backgroundColor: _currentDisplayTheme.backgroundColor,
       appBar: AppBar(
-        backgroundColor: widget.currentTheme.surfaceColor,
+        backgroundColor: _currentDisplayTheme.surfaceColor,
         title: Text(
           'Themes',
-          style: TextStyle(color: widget.currentTheme.textColor),
+          style: TextStyle(color: _currentDisplayTheme.textColor),
         ),
-        iconTheme: IconThemeData(color: widget.currentTheme.textColor),
+        iconTheme: IconThemeData(color: _currentDisplayTheme.textColor),
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(Icons.add, color: widget.currentTheme.textColor),
+            icon: Icon(Icons.add, color: _currentDisplayTheme.textColor),
             tooltip: 'Create Custom Theme',
             onPressed: _showCreateThemeDialog,
           ),
@@ -54,7 +71,7 @@ class _ThemePageState extends State<ThemePage> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: widget.currentTheme.textColor,
+                color: _currentDisplayTheme.textColor,
               ),
             ),
             const SizedBox(height: 16),
@@ -73,7 +90,7 @@ class _ThemePageState extends State<ThemePage> {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: widget.currentTheme.textColor,
+                  color: _currentDisplayTheme.textColor,
                 ),
               ),
               const SizedBox(height: 16),
@@ -99,124 +116,37 @@ class _ThemePageState extends State<ThemePage> {
       children: themesWithIndex.map((entry) {
         final index = entry.key;
         final theme = entry.value;
-        final isSelected = widget.currentThemeIndex == index;
+        final isSelected = _selectedThemeIndex == index;
 
-        return GestureDetector(
-          onTap: () => widget.onThemeChanged(index),
+        return _ThemeCard(
+          theme: theme,
+          currentTheme: _currentDisplayTheme,
+          isSelected: isSelected,
+          onTap: () => _handleThemeChanged(index),
           onLongPress: isBuiltIn ? null : () => _showDeleteThemeDialog(index, theme),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 140,
-            height: 160,
-            decoration: BoxDecoration(
-              color: theme.backgroundColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isSelected
-                    ? widget.currentTheme.accentColor
-                    : widget.currentTheme.secondaryTextColor.withValues(alpha: 0.3),
-                width: isSelected ? 3 : 1,
-              ),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: widget.currentTheme.accentColor.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Color palette preview
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildColorDot(theme.primaryColor),
-                    const SizedBox(width: 4),
-                    _buildColorDot(theme.accentColor),
-                    const SizedBox(width: 4),
-                    _buildColorDot(theme.surfaceColor),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Text preview
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: theme.surfaceColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Aa',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: theme.textColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  theme.name,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: theme.textColor,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  ),
-                ),
-                if (isSelected)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Icon(
-                      Icons.check_circle,
-                      size: 18,
-                      color: widget.currentTheme.accentColor,
-                    ),
-                  ),
-              ],
-            ),
-          ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildColorDot(Color color) {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-    );
-  }
 
   void _showDeleteThemeDialog(int index, CustomTheme theme) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: widget.currentTheme.surfaceColor,
+        backgroundColor: _currentDisplayTheme.surfaceColor,
         title: Text(
           'Delete Theme',
-          style: TextStyle(color: widget.currentTheme.textColor),
+          style: TextStyle(color: _currentDisplayTheme.textColor),
         ),
         content: Text(
           'Are you sure you want to delete "${theme.name}"?',
-          style: TextStyle(color: widget.currentTheme.secondaryTextColor),
+          style: TextStyle(color: _currentDisplayTheme.secondaryTextColor),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: widget.currentTheme.secondaryTextColor)),
+            child: Text('Cancel', style: TextStyle(color: _currentDisplayTheme.secondaryTextColor)),
           ),
           TextButton(
             onPressed: () {
@@ -232,22 +162,22 @@ class _ThemePageState extends State<ThemePage> {
 
   void _showCreateThemeDialog() {
     final nameController = TextEditingController();
-    Color backgroundColor = widget.currentTheme.backgroundColor;
-    Color surfaceColor = widget.currentTheme.surfaceColor;
-    Color primaryColor = widget.currentTheme.primaryColor;
-    Color textColor = widget.currentTheme.textColor;
-    Color secondaryTextColor = widget.currentTheme.secondaryTextColor;
-    Color accentColor = widget.currentTheme.accentColor;
-    Brightness brightness = widget.currentTheme.brightness;
+    Color backgroundColor = _currentDisplayTheme.backgroundColor;
+    Color surfaceColor = _currentDisplayTheme.surfaceColor;
+    Color primaryColor = _currentDisplayTheme.primaryColor;
+    Color textColor = _currentDisplayTheme.textColor;
+    Color secondaryTextColor = _currentDisplayTheme.secondaryTextColor;
+    Color accentColor = _currentDisplayTheme.accentColor;
+    Brightness brightness = _currentDisplayTheme.brightness;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: widget.currentTheme.surfaceColor,
+          backgroundColor: _currentDisplayTheme.surfaceColor,
           title: Text(
             'Create Custom Theme',
-            style: TextStyle(color: widget.currentTheme.textColor),
+            style: TextStyle(color: _currentDisplayTheme.textColor),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -255,15 +185,15 @@ class _ThemePageState extends State<ThemePage> {
               children: [
                 TextField(
                   controller: nameController,
-                  style: TextStyle(color: widget.currentTheme.textColor),
+                  style: TextStyle(color: _currentDisplayTheme.textColor),
                   decoration: InputDecoration(
                     labelText: 'Theme Name',
-                    labelStyle: TextStyle(color: widget.currentTheme.secondaryTextColor),
+                    labelStyle: TextStyle(color: _currentDisplayTheme.secondaryTextColor),
                     enabledBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: widget.currentTheme.secondaryTextColor),
+                      borderSide: BorderSide(color: _currentDisplayTheme.secondaryTextColor),
                     ),
                     focusedBorder: UnderlineInputBorder(
-                      borderSide: BorderSide(color: widget.currentTheme.accentColor),
+                      borderSide: BorderSide(color: _currentDisplayTheme.accentColor),
                     ),
                   ),
                 ),
@@ -290,10 +220,10 @@ class _ThemePageState extends State<ThemePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Dark Mode', style: TextStyle(color: widget.currentTheme.textColor)),
+                    Text('Dark Mode', style: TextStyle(color: _currentDisplayTheme.textColor)),
                     Switch(
                       value: brightness == Brightness.dark,
-                      activeTrackColor: widget.currentTheme.accentColor,
+                      activeTrackColor: _currentDisplayTheme.accentColor,
                       onChanged: (value) {
                         setDialogState(() {
                           brightness = value ? Brightness.dark : Brightness.light;
@@ -310,7 +240,7 @@ class _ThemePageState extends State<ThemePage> {
               onPressed: () => Navigator.pop(context),
               child: Text(
                 'Cancel',
-                style: TextStyle(color: widget.currentTheme.secondaryTextColor),
+                style: TextStyle(color: _currentDisplayTheme.secondaryTextColor),
               ),
             ),
             TextButton(
@@ -332,7 +262,7 @@ class _ThemePageState extends State<ThemePage> {
                   Navigator.pop(context);
                 }
               },
-              child: Text('Create', style: TextStyle(color: widget.currentTheme.accentColor)),
+              child: Text('Create', style: TextStyle(color: _currentDisplayTheme.accentColor)),
             ),
           ],
         ),
@@ -350,7 +280,7 @@ class _ThemePageState extends State<ThemePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: widget.currentTheme.textColor)),
+          Text(label, style: TextStyle(color: _currentDisplayTheme.textColor)),
           GestureDetector(
             onTap: () async {
               final color = await _showColorPickerDialog(currentColor);
@@ -364,7 +294,7 @@ class _ThemePageState extends State<ThemePage> {
               decoration: BoxDecoration(
                 color: currentColor,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: widget.currentTheme.secondaryTextColor),
+                border: Border.all(color: _currentDisplayTheme.secondaryTextColor),
               ),
             ),
           ),
@@ -377,8 +307,8 @@ class _ThemePageState extends State<ThemePage> {
     return showDialog<Color>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: widget.currentTheme.surfaceColor,
-        title: Text('Pick a Color', style: TextStyle(color: widget.currentTheme.textColor)),
+        backgroundColor: _currentDisplayTheme.surfaceColor,
+        title: Text('Pick a Color', style: TextStyle(color: _currentDisplayTheme.textColor)),
         content: SingleChildScrollView(
           child: Wrap(
             spacing: 8,
@@ -423,8 +353,8 @@ class _ThemePageState extends State<ThemePage> {
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: color == currentColor
-                              ? widget.currentTheme.accentColor
-                              : widget.currentTheme.secondaryTextColor,
+                              ? _currentDisplayTheme.accentColor
+                              : _currentDisplayTheme.secondaryTextColor,
                           width: color == currentColor ? 3 : 1,
                         ),
                       ),
@@ -439,3 +369,142 @@ class _ThemePageState extends State<ThemePage> {
   }
 }
 
+class _ThemeCard extends StatefulWidget {
+  final CustomTheme theme;
+  final CustomTheme currentTheme;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _ThemeCard({
+    required this.theme,
+    required this.currentTheme,
+    required this.isSelected,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  State<_ThemeCard> createState() => _ThemeCardState();
+}
+
+class _ThemeCardState extends State<_ThemeCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 140,
+          height: 160,
+          transform: _isHovered && !widget.isSelected
+              ? (Matrix4.identity()..setTranslationRaw(0.0, -4.0, 0.0))
+              : Matrix4.identity(),
+          decoration: BoxDecoration(
+            color: widget.theme.backgroundColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: widget.isSelected
+                  ? widget.currentTheme.accentColor
+                  : _isHovered
+                      ? widget.currentTheme.accentColor.withValues(alpha: 0.6)
+                      : widget.currentTheme.secondaryTextColor.withValues(alpha: 0.3),
+              width: widget.isSelected ? 3 : _isHovered ? 2 : 1,
+            ),
+            boxShadow: widget.isSelected
+                ? [
+                    BoxShadow(
+                      color: widget.currentTheme.accentColor.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : _isHovered
+                    ? [
+                        BoxShadow(
+                          color: widget.currentTheme.accentColor.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Color palette preview
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildColorDot(widget.theme.primaryColor),
+                  const SizedBox(width: 4),
+                  _buildColorDot(widget.theme.accentColor),
+                  const SizedBox(width: 4),
+                  _buildColorDot(widget.theme.surfaceColor),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Text preview
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: widget.theme.surfaceColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Aa',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: widget.theme.textColor,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                widget.theme.name,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: widget.theme.textColor,
+                  fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+              if (widget.isSelected)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Icon(
+                    Icons.check_circle,
+                    size: 18,
+                    color: widget.currentTheme.accentColor,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorDot(Color color) {
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+    );
+  }
+}

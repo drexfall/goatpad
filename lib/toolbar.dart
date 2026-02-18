@@ -156,14 +156,6 @@ class _ToolbarState extends State<Toolbar> {
       alignment: Alignment.center,
       child: Row(
         children: [
-          // Logo
-          Image.asset(
-            'goatpad-logo.png',
-            height: 28,
-            width: 28,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 8),
           Container(
             width: 1,
             height: 24,
