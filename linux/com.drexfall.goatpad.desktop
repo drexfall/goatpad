@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Goatpad
+Comment=A simple text editor that's allegedly the Greatest Of All Times
+Exec=goatpad %F
+Icon=goatpad
+Categories=Accessories;TextEditor;Utility;
+StartupNotify=true
+Terminal=false
+MimeType=text/plain;text/x-generic;application/json;
+Keywords=text;editor;notes;
+
