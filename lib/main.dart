@@ -165,6 +165,7 @@ class EditorTab {
   final String id;
   final TextEditingController controller;
   String? filePath;
+  String? contentUri; // Android content:// URI for writing back
   bool hasUnsavedChanges;
   DateTime? lastModified;
   StreamSubscription<FileSystemEvent>? fileWatcher;
@@ -173,13 +174,24 @@ class EditorTab {
     required this.id,
     required this.controller,
     this.filePath,
+    this.contentUri,
     this.hasUnsavedChanges = false,
     this.lastModified,
     this.fileWatcher,
   });
 
-  String get fileName =>
-      filePath?.split(Platform.pathSeparator).last ?? 'Untitled';
+  String get fileName {
+    if (filePath != null) {
+      return filePath!.split(Platform.pathSeparator).last;
+    }
+    if (contentUri != null) {
+      // Extract display name from content:// URI (last path segment, URL-decoded)
+      final segment = Uri.parse(contentUri!).pathSegments.lastOrNull;
+      if (segment != null && segment.isNotEmpty)
+        return Uri.decodeComponent(segment);
+    }
+    return 'Untitled';
+  }
 
   void dispose() {
     controller.dispose();
@@ -197,6 +209,8 @@ class TextEditorScreen extends StatefulWidget {
 }
 
 class _TextEditorScreenState extends State<TextEditorScreen> {
+  static const _fileIoChannel = MethodChannel('com.drexfall.goatpad/file_io');
+
   final List<EditorTab> _tabs = [];
   int _currentTabIndex = 0;
   List<CustomTheme> _themes = [];
@@ -260,7 +274,10 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   EditorTab get _currentTab => _tabs[_currentTabIndex];
 
   void _createNewTab(
-      {String? filePath, String? content, DateTime? lastModified}) {
+      {String? filePath,
+      String? contentUri,
+      String? content,
+      DateTime? lastModified}) {
     // Check max tabs limit (0 = unlimited)
     if (_maxTabs > 0 && _tabs.length >= _maxTabs) {
       _showMaxTabsAlert();
@@ -273,6 +290,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       controller: controller,
       filePath: filePath,
+      contentUri: contentUri,
       hasUnsavedChanges: false,
       lastModified: lastModified,
     );
@@ -557,12 +575,19 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       allowedExtensions: ['txt'],
     );
 
-    if (result != null && result.files.single.path != null) {
-      final filePath = result.files.single.path!;
+    if (result != null && result.files.isNotEmpty) {
+      final pickedFile = result.files.single;
+      final filePath = pickedFile.path;
+      // On Android, identifier holds the content:// URI needed for writing back
+      final contentUri = (Platform.isAndroid) ? pickedFile.identifier : null;
+
+      // Need at least one of these to read the file
+      if (filePath == null && contentUri == null) return;
 
       // Check if file is already open in a tab
-      final existingTabIndex =
-          _tabs.indexWhere((tab) => tab.filePath == filePath);
+      final existingTabIndex = _tabs.indexWhere((tab) =>
+          (filePath != null && tab.filePath == filePath) ||
+          (contentUri != null && tab.contentUri == contentUri));
       if (existingTabIndex != -1) {
         setState(() {
           _currentTabIndex = existingTabIndex;
@@ -571,54 +596,115 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         return;
       }
 
-      final file = File(filePath);
-      final content = await file.readAsString();
-      final fileStat = await file.stat();
+      String content;
+      DateTime? lastModified;
+      if (filePath != null) {
+        final file = File(filePath);
+        content = await file.readAsString();
+        final fileStat = await file.stat();
+        lastModified = fileStat.modified;
+      } else {
+        // Shouldn't happen for txt files, but fallback
+        content = '';
+      }
 
       _createNewTab(
-          filePath: filePath,
-          content: content,
-          lastModified: fileStat.modified);
+        filePath: filePath,
+        contentUri: contentUri,
+        content: content,
+        lastModified: lastModified,
+      );
       _showSnackBar('File opened successfully');
     }
   }
 
   Future<void> _saveFile() async {
-    if (_currentTab.filePath != null) {
-      final file = File(_currentTab.filePath!);
-      await file.writeAsString(_currentTab.controller.text);
-      final fileStat = await file.stat();
-      setState(() {
-        _currentTab.hasUnsavedChanges = false;
-        _currentTab.lastModified = fileStat.modified;
-      });
-      _showSnackBar('File saved successfully');
+    final path = _currentTab.contentUri ?? _currentTab.filePath;
+    if (path != null) {
+      if (Platform.isAndroid) {
+        // Ensure we have storage permission for plain file paths on Android 11+
+        if (!path.startsWith('content://')) {
+          final hasPerm = await _fileIoChannel
+                  .invokeMethod<bool>('hasManageStoragePermission') ??
+              false;
+          if (!hasPerm) {
+            await _fileIoChannel.invokeMethod('requestManageStoragePermission');
+            _showSnackBar('Please grant storage permission, then save again');
+            return;
+          }
+        }
+        await _fileIoChannel.invokeMethod('writeFile', {
+          'path': path,
+          'content': _currentTab.controller.text,
+        });
+        setState(() => _currentTab.hasUnsavedChanges = false);
+        _showSnackBar('File saved successfully');
+      } else {
+        final file = File(_currentTab.filePath!);
+        await file.writeAsString(_currentTab.controller.text);
+        final fileStat = await file.stat();
+        setState(() {
+          _currentTab.hasUnsavedChanges = false;
+          _currentTab.lastModified = fileStat.modified;
+        });
+        _showSnackBar('File saved successfully');
+      }
     } else {
       await _saveFileAs();
     }
   }
 
   Future<void> _saveFileAs() async {
+    final bytes = Uint8List.fromList(
+      utf8.encode(_currentTab.controller.text),
+    );
+
+    final String fileName = _currentTab.filePath != null
+        ? _currentTab.filePath!.split(Platform.pathSeparator).last
+        : (_currentTab.contentUri != null
+            ? Uri.parse(_currentTab.contentUri!).pathSegments.last
+            : 'untitled.txt');
+
     final path = await FilePicker.platform.saveFile(
       dialogTitle: 'Save file as',
-      fileName: 'untitled.txt',
+      fileName: fileName,
       type: FileType.custom,
       allowedExtensions: ['txt'],
+      bytes: (Platform.isAndroid || Platform.isIOS) ? bytes : null,
     );
 
     if (path != null) {
-      final file = File(path);
-      await file.writeAsString(_currentTab.controller.text);
-      final fileStat = await file.stat();
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        final file = File(path);
+        await file.writeAsBytes(bytes);
+      }
+
+      DateTime? lastModified;
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        final fileStat = await File(path).stat();
+        lastModified = fileStat.modified;
+      }
 
       setState(() {
-        _currentTab.filePath = path;
+        if (Platform.isAndroid) {
+          // path from saveFile may be a content:// URI or a plain path
+          if (path.startsWith('content://')) {
+            _currentTab.contentUri = path;
+          } else {
+            _currentTab.filePath = path;
+            _currentTab.contentUri = null;
+          }
+        } else {
+          _currentTab.filePath = path;
+        }
         _currentTab.hasUnsavedChanges = false;
-        _currentTab.lastModified = fileStat.modified;
+        if (lastModified != null) {
+          _currentTab.lastModified = lastModified;
+        }
       });
 
       // Set up file watching for the newly saved file
-      if (!kIsWeb) {
+      if (!kIsWeb && !Platform.isAndroid && !Platform.isIOS) {
         _setupFileWatcher(_currentTab);
       }
 
