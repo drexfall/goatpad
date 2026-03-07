@@ -85,7 +85,8 @@ class _ToolbarState extends State<Toolbar> {
               Expanded(
                 child: Text(
                   font,
-                  style: GoogleFonts.getFont(font, color: widget.theme.textColor),
+                  style:
+                      GoogleFonts.getFont(font, color: widget.theme.textColor),
                 ),
               ),
               if (widget.selectedFont == font)
@@ -156,15 +157,15 @@ class _ToolbarState extends State<Toolbar> {
       alignment: Alignment.center,
       child: Row(
         children: [
-          Container(
-            width: 1,
-            height: 24,
-            color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
-          ),
-          const SizedBox(width: 8),
-
           // Edit Actions (Cut/Copy/Paste)
+
           if (isDesktop) ...[
+            Container(
+              width: 1,
+              height: 24,
+              color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+            ),
+            const SizedBox(width: 8),
             _buildToolbarButton(
               icon: Icons.content_cut,
               tooltip: 'Cut',
@@ -234,7 +235,7 @@ class _ToolbarState extends State<Toolbar> {
               height: 24,
               color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 4)
           ],
 
           // Font Selector
@@ -248,7 +249,8 @@ class _ToolbarState extends State<Toolbar> {
                   color: widget.theme.backgroundColor,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+                    color:
+                        widget.theme.secondaryTextColor.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -281,112 +283,108 @@ class _ToolbarState extends State<Toolbar> {
           ),
           const SizedBox(width: 8),
 
-          // Font Weight Selector
-          if (isDesktop)
-            Builder(
-              builder: (context) => InkWell(
-                onTap: () => _showWeightDropdown(context),
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: widget.theme.backgroundColor,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _getCurrentWeightName(),
-                        style: TextStyle(
-                          color: widget.theme.textColor,
-                          fontSize: 13,
-                          fontWeight: widget.fontWeight,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_drop_down,
-                        size: 18,
-                        color: widget.theme.secondaryTextColor,
-                      ),
-                    ],
+          Builder(
+            builder: (context) => InkWell(
+              onTap: () => _showWeightDropdown(context),
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: widget.theme.backgroundColor,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color:
+                        widget.theme.secondaryTextColor.withValues(alpha: 0.3),
                   ),
                 ),
-              ),
-            ),
-
-          if (isDesktop) const SizedBox(width: 8),
-
-          // Font Size Controls
-          if (isDesktop) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: widget.theme.backgroundColor,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  InkWell(
-                    onTap: () {
-                      if (widget.fontSize > 10) {
-                        widget.onFontSizeChanged(widget.fontSize - 1);
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.remove,
-                        size: 16,
-                        color: widget.theme.textColor,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    constraints: const BoxConstraints(minWidth: 30),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${widget.fontSize.toInt()}',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _getCurrentWeightName(),
                       style: TextStyle(
                         color: widget.theme.textColor,
                         fontSize: 13,
+                        fontWeight: widget.fontWeight,
                       ),
                     ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      if (widget.fontSize < 40) {
-                        widget.onFontSizeChanged(widget.fontSize + 1);
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.add,
-                        size: 16,
-                        color: widget.theme.textColor,
-                      ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      size: 18,
+                      color: widget.theme.secondaryTextColor,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 8),
-            Container(
-              width: 1,
-              height: 24,
-              color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+          ),
+
+          const SizedBox(width: 8),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: widget.theme.backgroundColor,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+              ),
             ),
-            const SizedBox(width: 4),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () {
+                    if (widget.fontSize > 10) {
+                      widget.onFontSizeChanged(widget.fontSize - 1);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.remove,
+                      size: 16,
+                      color: widget.theme.textColor,
+                    ),
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 30),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${widget.fontSize.toInt()}',
+                    style: TextStyle(
+                      color: widget.theme.textColor,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    if (widget.fontSize < 40) {
+                      widget.onFontSizeChanged(widget.fontSize + 1);
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.add,
+                      size: 16,
+                      color: widget.theme.textColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 1,
+            height: 24,
+            color: widget.theme.secondaryTextColor.withValues(alpha: 0.3),
+          ),
+          const SizedBox(width: 4),
 
           // File Actions (Desktop only - mobile uses bottom drawer)
           if (isDesktop) ...[

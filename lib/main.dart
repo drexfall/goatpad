@@ -197,13 +197,14 @@ class TextEditorScreen extends StatefulWidget {
 }
 
 class _TextEditorScreenState extends State<TextEditorScreen> {
-  List<EditorTab> _tabs = [];
+  final List<EditorTab> _tabs = [];
   int _currentTabIndex = 0;
   List<CustomTheme> _themes = [];
   int _currentThemeIndex = 0;
   String _selectedFont = 'Roboto';
   double _fontSize = 16.0;
   FontWeight _fontWeight = FontWeight.normal;
+  int _maxTabs = 10; // 0 means unlimited
 
   final List<String> _availableFonts = [
     'Roboto',
@@ -260,6 +261,12 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
   void _createNewTab(
       {String? filePath, String? content, DateTime? lastModified}) {
+    // Check max tabs limit (0 = unlimited)
+    if (_maxTabs > 0 && _tabs.length >= _maxTabs) {
+      _showMaxTabsAlert();
+      return;
+    }
+
     final controller = TextEditingController(text: content ?? '');
 
     final tab = EditorTab(
@@ -287,6 +294,33 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     if (filePath != null && !kIsWeb) {
       _setupFileWatcher(tab);
     }
+  }
+
+  void _showMaxTabsAlert() {
+    final theme = _themes[_currentThemeIndex];
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.surfaceColor,
+        title: Row(
+          children: [
+            Icon(Icons.tab, color: theme.accentColor),
+            const SizedBox(width: 12),
+            Text('Tab Limit Reached', style: TextStyle(color: theme.textColor)),
+          ],
+        ),
+        content: Text(
+          'You have reached the maximum of $_maxTabs open tabs. Please close some tabs before opening new ones.\n\nYou can change this limit in Settings.',
+          style: TextStyle(color: theme.secondaryTextColor),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('OK', style: TextStyle(color: theme.accentColor)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _setupFileWatcher(EditorTab tab) {
@@ -418,6 +452,53 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     });
   }
 
+  Future<void> _openMobileTabSwitcher() async {
+    final theme = _themes[_currentThemeIndex];
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MobileTabSwitcherScreen(
+          tabs: _tabs,
+          currentTabIndex: _currentTabIndex,
+          theme: theme,
+          onSelectTab: (index) {
+            setState(() => _currentTabIndex = index);
+            Navigator.pop(context);
+          },
+          onCloseTab: (index) async {
+            if (_tabs[index].hasUnsavedChanges) {
+              // pop the switcher first so the dialog shows properly
+              Navigator.pop(context);
+              _closeTab(index);
+              // re-open switcher if there are still tabs
+              if (_tabs.isNotEmpty && mounted) {
+                _openMobileTabSwitcher();
+              }
+            } else {
+              setState(() {
+                _tabs[index].dispose();
+                _tabs.removeAt(index);
+                if (_tabs.isEmpty) {
+                  _createNewTab();
+                } else if (_currentTabIndex >= _tabs.length) {
+                  _currentTabIndex = _tabs.length - 1;
+                }
+              });
+              if (_tabs.isEmpty) {
+                Navigator.pop(context);
+              }
+            }
+          },
+          onNewTab: () {
+            Navigator.pop(context);
+            _newFile();
+          },
+          maxTabs: _maxTabs,
+        ),
+      ),
+    );
+  }
+
   void _onTextChanged(int tabIndex) {
     if (tabIndex < _tabs.length && !_tabs[tabIndex].hasUnsavedChanges) {
       setState(() => _tabs[tabIndex].hasUnsavedChanges = true);
@@ -441,6 +522,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       _fontSize = widget.prefs.getDouble('font_size') ?? 16.0;
       final weightIndex = widget.prefs.getInt('font_weight') ?? 3;
       _fontWeight = _fontWeights.values.elementAt(weightIndex);
+      _maxTabs = widget.prefs.getInt('max_tabs') ?? 10;
     });
   }
 
@@ -452,6 +534,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       'font_weight',
       _fontWeights.values.toList().indexOf(_fontWeight),
     );
+    await widget.prefs.setInt('max_tabs', _maxTabs);
 
     final themesJson = jsonEncode(_themes.map((t) => t.toJson()).toList());
     await widget.prefs.setString('custom_themes', themesJson);
@@ -598,6 +681,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         builder: (context) => QRScannerScreen(
           theme: _themes[_currentThemeIndex],
           onScan: (text) {
+            print("Scanned text: $text");
             setState(() {
               _currentTab.controller.text = text;
               _currentTab.hasUnsavedChanges = true;
@@ -641,6 +725,53 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               _showSnackBar('Theme deleted');
             }
           },
+        ),
+      ),
+    );
+  }
+
+  void _openSettingsPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SettingsPanelScreen(
+          theme: _themes[_currentThemeIndex],
+          themes: _themes,
+          currentThemeIndex: _currentThemeIndex,
+          selectedFont: _selectedFont,
+          fontSize: _fontSize,
+          fontWeight: _fontWeight,
+          fontWeights: _fontWeights,
+          availableFonts: _availableFonts,
+          maxTabs: _maxTabs,
+          onThemeChanged: (index) {
+            setState(() => _currentThemeIndex = index);
+            _saveSettings();
+          },
+          onFontChanged: (font) {
+            setState(() => _selectedFont = font);
+            _saveSettings();
+          },
+          onFontWeightChanged: (weight) {
+            setState(() => _fontWeight = weight);
+            _saveSettings();
+          },
+          onFontSizeChanged: (size) {
+            setState(() => _fontSize = size);
+            _saveSettings();
+          },
+          onMaxTabsChanged: (max) {
+            setState(() => _maxTabs = max);
+            _saveSettings();
+          },
+          onThemeCreated: (newTheme) {
+            setState(() {
+              _themes.add(newTheme);
+              _currentThemeIndex = _themes.length - 1;
+            });
+            _saveSettings();
+          },
+          onShowThemePicker: _openThemePage,
         ),
       ),
     );
@@ -706,6 +837,9 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                   color: theme.surfaceColor,
                   onSelected: (value) {
                     switch (value) {
+                      case 'settings':
+                        _openSettingsPage();
+                        break;
                       case 'about':
                         _showAboutDialog();
                         break;
@@ -715,6 +849,18 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                     }
                   },
                   itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'settings',
+                      child: Row(
+                        children: [
+                          Icon(Icons.settings_outlined,
+                              color: theme.textColor, size: 20),
+                          const SizedBox(width: 12),
+                          Text('Settings',
+                              style: TextStyle(color: theme.textColor)),
+                        ],
+                      ),
+                    ),
                     PopupMenuItem(
                       value: 'about',
                       child: Row(
@@ -745,77 +891,54 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           ),
           body: Column(
             children: [
-              // Reorderable Tab bar
-              Container(
-                height: 48,
-                color: theme.surfaceColor,
-                child: ReorderableListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  buildDefaultDragHandles: false,
-                  itemCount: _tabs.length,
-                  onReorder: _reorderTabs,
-                  proxyDecorator: (child, index, animation) {
-                    return Material(
-                      color: theme.backgroundColor,
-                      elevation: 4,
-                      child: child,
-                    );
-                  },
-                  itemBuilder: (context, index) {
-                    final tab = _tabs[index];
-                    final isSelected = index == _currentTabIndex;
-
-                    return ReorderableDragStartListener(
-                      key: ValueKey(tab.id),
-                      index: index,
-                      child: Tooltip(
-                        message: tab.filePath ?? 'Untitled',
-                        child: InkWell(
-                          onTap: () => _switchTab(index),
-                          child: Container(
-                            constraints: const BoxConstraints(
-                              minWidth: 120,
-                              maxWidth: 200,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? theme.backgroundColor
-                                  : theme.surfaceColor,
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: isSelected
-                                      ? theme.accentColor
-                                      : Colors.transparent,
-                                  width: 2,
-                                ),
-                                right: BorderSide(
-                                  color: theme.secondaryTextColor
-                                      .withValues(alpha: 0.2),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+              // Mobile filename/path bar
+              if (isMobile)
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.surfaceColor,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: theme.secondaryTextColor.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _currentTab.filePath != null
+                            ? Icons.insert_drive_file_outlined
+                            : Icons.article_outlined,
+                        size: 15,
+                        color: _currentTab.hasUnsavedChanges
+                            ? theme.accentColor
+                            : theme.secondaryTextColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
                               children: [
                                 Flexible(
                                   child: Text(
-                                    tab.fileName,
+                                    _currentTab.fileName,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      color: isSelected
-                                          ? theme.textColor
-                                          : theme.secondaryTextColor,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.textColor,
                                     ),
                                   ),
                                 ),
-                                if (tab.hasUnsavedChanges)
+                                if (_currentTab.hasUnsavedChanges) ...[
+                                  const SizedBox(width: 6),
                                   Container(
-                                    margin: const EdgeInsets.only(left: 4),
                                     width: 6,
                                     height: 6,
                                     decoration: BoxDecoration(
@@ -823,28 +946,167 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                                       shape: BoxShape.circle,
                                     ),
                                   ),
-                                const SizedBox(width: 8),
-                                InkWell(
-                                  onTap: () => _closeTab(index),
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(2),
-                                    child: Icon(
-                                      Icons.close,
-                                      size: 16,
-                                      color: theme.secondaryTextColor,
+                                ],
+                              ],
+                            ),
+                            if (_currentTab.filePath != null)
+                              Text(
+                                _currentTab.filePath!,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: theme.secondaryTextColor
+                                      .withValues(alpha: 0.7),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // Tab bar — desktop only (mobile uses grid tab switcher)
+              if (!isMobile)
+                Container(
+                  height: 48,
+                  color: theme.surfaceColor,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ReorderableListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          buildDefaultDragHandles: false,
+                          itemCount: _tabs.length,
+                          onReorder: _reorderTabs,
+                          proxyDecorator: (child, index, animation) {
+                            return Material(
+                              color: theme.backgroundColor,
+                              elevation: 4,
+                              child: child,
+                            );
+                          },
+                          itemBuilder: (context, index) {
+                            final tab = _tabs[index];
+                            final isSelected = index == _currentTabIndex;
+
+                            return ReorderableDragStartListener(
+                              key: ValueKey(tab.id),
+                              index: index,
+                              child: Tooltip(
+                                message: tab.filePath ?? 'Untitled',
+                                child: InkWell(
+                                  onTap: () => _switchTab(index),
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 120,
+                                      maxWidth: 200,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? theme.backgroundColor
+                                          : theme.surfaceColor,
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: isSelected
+                                              ? theme.accentColor
+                                              : Colors.transparent,
+                                          width: 2,
+                                        ),
+                                        right: BorderSide(
+                                          color: theme.secondaryTextColor
+                                              .withValues(alpha: 0.2),
+                                          width: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            tab.fileName,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: isSelected
+                                                  ? theme.textColor
+                                                  : theme.secondaryTextColor,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w600
+                                                  : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                        if (tab.hasUnsavedChanges)
+                                          Container(
+                                            margin:
+                                                const EdgeInsets.only(left: 4),
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                              color: theme.accentColor,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                        const SizedBox(width: 8),
+                                        InkWell(
+                                          onTap: () => _closeTab(index),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(2),
+                                            child: Icon(
+                                              Icons.close,
+                                              size: 16,
+                                              color: theme.secondaryTextColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
-                              ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      // New Tab button integrated with the tab bar
+                      Tooltip(
+                        message: _maxTabs > 0 && _tabs.length >= _maxTabs
+                            ? 'Tab limit reached ($_maxTabs)'
+                            : 'New Tab',
+                        child: InkWell(
+                          onTap: _newFile,
+                          child: Container(
+                            width: 40,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: theme.surfaceColor,
+                              border: Border(
+                                left: BorderSide(
+                                  color: theme.secondaryTextColor
+                                      .withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.add,
+                              size: 18,
+                              color: _maxTabs > 0 && _tabs.length >= _maxTabs
+                                  ? theme.secondaryTextColor
+                                      .withValues(alpha: 0.3)
+                                  : theme.secondaryTextColor,
                             ),
                           ),
                         ),
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
-              ),
               // Editor
               Expanded(
                 child: Container(
@@ -911,11 +1173,54 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                 onTap: _saveFile,
                 theme: theme,
               ),
-              _buildMobileNavItem(
-                icon: Icons.share,
-                label: 'Share',
-                onTap: _showShareDialog,
-                theme: theme,
+              // Tabs switcher button with count badge
+              InkWell(
+                onTap: _openMobileTabSwitcher,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(Icons.tab_outlined,
+                              color: theme.textColor, size: 24),
+                          Positioned(
+                            top: -4,
+                            right: -6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: theme.accentColor,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${_tabs.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tabs',
+                        style: TextStyle(
+                          color: theme.secondaryTextColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               _buildMobileNavItem(
                 icon: Icons.more_horiz,
@@ -1014,6 +1319,15 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _showMobileFontSettings(theme);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.settings_outlined, color: theme.textColor),
+                title:
+                    Text('Settings', style: TextStyle(color: theme.textColor)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _openSettingsPage();
                 },
               ),
               const Divider(),
@@ -1236,7 +1550,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           width: MediaQuery.of(context).size.width * 0.6,
           child: isDesktop
               ? Row(
-            spacing: 48,
+                  spacing: 48,
                   children: [
                     Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1356,6 +1670,261 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Mobile Tab Switcher — grid layout (Chrome / Firefox style)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class MobileTabSwitcherScreen extends StatefulWidget {
+  final List<EditorTab> tabs;
+  final int currentTabIndex;
+  final CustomTheme theme;
+  final void Function(int index) onSelectTab;
+  final void Function(int index) onCloseTab;
+  final VoidCallback onNewTab;
+  final int maxTabs;
+
+  const MobileTabSwitcherScreen({
+    super.key,
+    required this.tabs,
+    required this.currentTabIndex,
+    required this.theme,
+    required this.onSelectTab,
+    required this.onCloseTab,
+    required this.onNewTab,
+    required this.maxTabs,
+  });
+
+  @override
+  State<MobileTabSwitcherScreen> createState() =>
+      _MobileTabSwitcherScreenState();
+}
+
+class _MobileTabSwitcherScreenState extends State<MobileTabSwitcherScreen> {
+  // Local copy so we can animate removals without waiting for parent to rebuild
+  late List<EditorTab> _localTabs;
+  late int _localCurrentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _localTabs = List.of(widget.tabs);
+    _localCurrentIndex = widget.currentTabIndex;
+  }
+
+  bool get _atLimit =>
+      widget.maxTabs > 0 && _localTabs.length >= widget.maxTabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = widget.theme;
+
+    return Scaffold(
+      backgroundColor: theme.backgroundColor,
+      appBar: AppBar(
+        backgroundColor: theme.surfaceColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: theme.textColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          '${_localTabs.length} Tab${_localTabs.length == 1 ? '' : 's'}',
+          style: TextStyle(
+            color: theme.textColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          if (!_atLimit)
+            IconButton(
+              icon: Icon(Icons.add, color: theme.accentColor),
+              tooltip: 'New Tab',
+              onPressed: widget.onNewTab,
+            )
+          else
+            Tooltip(
+              message: 'Tab limit reached (${widget.maxTabs})',
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Icon(Icons.add,
+                    color: theme.secondaryTextColor.withValues(alpha: 0.3)),
+              ),
+            ),
+        ],
+      ),
+      body: _localTabs.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.tab_outlined,
+                      size: 64,
+                      color: theme.secondaryTextColor.withValues(alpha: 0.4)),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No tabs open',
+                    style: TextStyle(
+                        color: theme.secondaryTextColor, fontSize: 16),
+                  ),
+                ],
+              ),
+            )
+          : GridView.builder(
+              padding: const EdgeInsets.all(12),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.72,
+              ),
+              itemCount: _localTabs.length,
+              itemBuilder: (context, index) {
+                final tab = _localTabs[index];
+                final isSelected = index == _localCurrentIndex;
+
+                return GestureDetector(
+                  onTap: () => widget.onSelectTab(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      color: theme.surfaceColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? theme.accentColor
+                            : theme.secondaryTextColor.withValues(alpha: 0.15),
+                        width: isSelected ? 2.5 : 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Tab header row
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? theme.accentColor.withValues(alpha: 0.15)
+                                : theme.backgroundColor.withValues(alpha: 0.5),
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(11)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                tab.filePath != null
+                                    ? Icons.insert_drive_file_outlined
+                                    : Icons.article_outlined,
+                                size: 14,
+                                color: isSelected
+                                    ? theme.accentColor
+                                    : theme.secondaryTextColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  tab.fileName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? theme.accentColor
+                                        : theme.textColor,
+                                  ),
+                                ),
+                              ),
+                              if (tab.hasUnsavedChanges)
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  margin: const EdgeInsets.only(right: 4),
+                                  decoration: BoxDecoration(
+                                    color: theme.accentColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _localTabs.removeAt(index);
+                                    if (_localCurrentIndex >=
+                                            _localTabs.length &&
+                                        _localCurrentIndex > 0) {
+                                      _localCurrentIndex--;
+                                    }
+                                  });
+                                  widget.onCloseTab(index);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(2),
+                                  child: Icon(Icons.close,
+                                      size: 14,
+                                      color: theme.secondaryTextColor),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Content preview
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: theme.backgroundColor,
+                              borderRadius: const BorderRadius.vertical(
+                                  bottom: Radius.circular(11)),
+                            ),
+                            child: Text(
+                              tab.controller.text.isEmpty
+                                  ? 'Empty document'
+                                  : tab.controller.text,
+                              maxLines: 10,
+                              overflow: TextOverflow.fade,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: tab.controller.text.isEmpty
+                                    ? theme.secondaryTextColor
+                                        .withValues(alpha: 0.4)
+                                    : theme.secondaryTextColor
+                                        .withValues(alpha: 0.8),
+                                height: 1.4,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+      // Floating action button to open a new tab (bottom-right shortcut)
+      floatingActionButton: _atLimit
+          ? null
+          : FloatingActionButton(
+              onPressed: widget.onNewTab,
+              backgroundColor: theme.accentColor,
+              foregroundColor: Colors.white,
+              tooltip: 'New Tab',
+              child: const Icon(Icons.add),
+            ),
+    );
+  }
+}
+
 class SettingsPanelScreen extends StatefulWidget {
   final CustomTheme theme;
   final List<CustomTheme> themes;
@@ -1365,10 +1934,12 @@ class SettingsPanelScreen extends StatefulWidget {
   final FontWeight fontWeight;
   final Map<String, FontWeight> fontWeights;
   final List<String> availableFonts;
+  final int maxTabs;
   final Function(int) onThemeChanged;
   final Function(String) onFontChanged;
   final Function(FontWeight) onFontWeightChanged;
   final Function(double) onFontSizeChanged;
+  final Function(int) onMaxTabsChanged;
   final Function(CustomTheme) onThemeCreated;
   final VoidCallback onShowThemePicker;
 
@@ -1382,10 +1953,12 @@ class SettingsPanelScreen extends StatefulWidget {
     required this.fontWeight,
     required this.fontWeights,
     required this.availableFonts,
+    required this.maxTabs,
     required this.onThemeChanged,
     required this.onFontChanged,
     required this.onFontWeightChanged,
     required this.onFontSizeChanged,
+    required this.onMaxTabsChanged,
     required this.onThemeCreated,
     required this.onShowThemePicker,
   });
@@ -1468,6 +2041,20 @@ class _SettingsPanelScreenState extends State<SettingsPanelScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildFontSizeSlider(),
+                    const SizedBox(height: 32),
+
+                    // Tabs Section
+                    Text(
+                      'Tabs',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: widget.theme.textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildMaxTabsSetting(),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -1586,6 +2173,72 @@ class _SettingsPanelScreenState extends State<SettingsPanelScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildMaxTabsSetting() {
+    final options = [
+      {'label': 'Unlimited', 'value': 0},
+      {'label': '5 tabs', 'value': 5},
+      {'label': '10 tabs', 'value': 10},
+      {'label': '15 tabs', 'value': 15},
+      {'label': '20 tabs', 'value': 20},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Maximum number of tabs',
+          style:
+              TextStyle(color: widget.theme.secondaryTextColor, fontSize: 13),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((option) {
+            final value = option['value'] as int;
+            final isSelected = widget.maxTabs == value;
+            return GestureDetector(
+              onTap: () => widget.onMaxTabsChanged(value),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? widget.theme.accentColor
+                      : widget.theme.surfaceColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? widget.theme.accentColor
+                        : widget.theme.secondaryTextColor
+                            .withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  option['label'] as String,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : widget.theme.textColor,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        if (widget.maxTabs > 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            'When the limit is reached, you will be prompted to close a tab before opening a new one.',
+            style: TextStyle(
+                color: widget.theme.secondaryTextColor.withValues(alpha: 0.7),
+                fontSize: 12),
+          ),
+        ],
+      ],
     );
   }
 
