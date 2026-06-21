@@ -208,8 +208,12 @@ class TextEditorScreen extends StatefulWidget {
   State<TextEditorScreen> createState() => _TextEditorScreenState();
 }
 
-class _TextEditorScreenState extends State<TextEditorScreen> {
+class _TextEditorScreenState extends State<TextEditorScreen>
+    with WidgetsBindingObserver {
   static const _fileIoChannel = MethodChannel('com.drexfall.goatpad/file_io');
+  static const _sessionKey = 'editor_session';
+
+  Timer? _sessionSaveTimer;
 
   final List<EditorTab> _tabs = [];
   int _currentTabIndex = 0;
@@ -258,13 +262,36 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
-    // Create initial empty tab
-    _createNewTab();
+    WidgetsBinding.instance.addObserver(this);
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _loadSettings();
+    // Restore last session; fall back to a fresh empty tab.
+    final restored = await _restoreSession();
+    if (!restored) {
+      _createNewTab();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Flush session whenever the app is backgrounded/closed so unsaved work
+    // survives even if the user never exported the file.
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _sessionSaveTimer?.cancel();
+      _persistSession();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sessionSaveTimer?.cancel();
     for (var tab in _tabs) {
       tab.dispose();
     }
@@ -312,6 +339,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     if (filePath != null && !kIsWeb) {
       _setupFileWatcher(tab);
     }
+
+    _persistSession();
   }
 
   void _showMaxTabsAlert() {
@@ -444,6 +473,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         _currentTabIndex++;
       }
     });
+    _persistSession();
   }
 
   void _closeTab(int index) async {
@@ -462,12 +492,14 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         _currentTabIndex = _tabs.length - 1;
       }
     });
+    _persistSession();
   }
 
   void _switchTab(int index) {
     setState(() {
       _currentTabIndex = index;
     });
+    _persistSession();
   }
 
   Future<void> _openMobileTabSwitcher() async {
@@ -481,6 +513,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           theme: theme,
           onSelectTab: (index) {
             setState(() => _currentTabIndex = index);
+            _persistSession();
             Navigator.pop(context);
           },
           onCloseTab: (index) async {
@@ -502,6 +535,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                   _currentTabIndex = _tabs.length - 1;
                 }
               });
+              _persistSession();
               if (_tabs.isEmpty) {
                 Navigator.pop(context);
               }
@@ -520,6 +554,75 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   void _onTextChanged(int tabIndex) {
     if (tabIndex < _tabs.length && !_tabs[tabIndex].hasUnsavedChanges) {
       setState(() => _tabs[tabIndex].hasUnsavedChanges = true);
+    }
+    _scheduleSessionSave();
+  }
+
+  // ---- Local session persistence (localStorage on web, app storage native) ----
+
+  void _scheduleSessionSave() {
+    _sessionSaveTimer?.cancel();
+    _sessionSaveTimer =
+        Timer(const Duration(milliseconds: 400), _persistSession);
+  }
+
+  Future<void> _persistSession() async {
+    final tabsData = _tabs
+        .map((t) => {
+              'id': t.id,
+              'content': t.controller.text,
+              'filePath': t.filePath,
+              'contentUri': t.contentUri,
+              'hasUnsavedChanges': t.hasUnsavedChanges,
+            })
+        .toList();
+    await widget.prefs.setString(
+      _sessionKey,
+      jsonEncode({'tabs': tabsData, 'currentIndex': _currentTabIndex}),
+    );
+  }
+
+  Future<bool> _restoreSession() async {
+    final sessionJson = widget.prefs.getString(_sessionKey);
+    if (sessionJson == null) return false;
+
+    try {
+      final Map<String, dynamic> data = jsonDecode(sessionJson);
+      final List<dynamic> tabsData = data['tabs'] ?? [];
+      if (tabsData.isEmpty) return false;
+
+      final restored = <EditorTab>[];
+      for (final t in tabsData) {
+        final controller = TextEditingController(text: t['content'] ?? '');
+        final tab = EditorTab(
+          id: t['id'] ?? DateTime.now().microsecondsSinceEpoch.toString(),
+          controller: controller,
+          filePath: t['filePath'],
+          contentUri: t['contentUri'],
+          hasUnsavedChanges: t['hasUnsavedChanges'] ?? false,
+        );
+        controller.addListener(() {
+          final idx = _tabs.indexWhere((x) => x.id == tab.id);
+          if (idx != -1) _onTextChanged(idx);
+        });
+        restored.add(tab);
+      }
+
+      setState(() {
+        _tabs.addAll(restored);
+        _currentTabIndex =
+            (data['currentIndex'] as int? ?? 0).clamp(0, restored.length - 1);
+      });
+
+      // Re-attach file watchers for file-backed tabs (desktop only).
+      if (!kIsWeb) {
+        for (final tab in restored) {
+          if (tab.filePath != null) _setupFileWatcher(tab);
+        }
+      }
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
@@ -638,6 +741,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           'content': _currentTab.controller.text,
         });
         setState(() => _currentTab.hasUnsavedChanges = false);
+        _persistSession();
         _showSnackBar('File saved successfully');
       } else {
         final file = File(_currentTab.filePath!);
@@ -647,6 +751,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           _currentTab.hasUnsavedChanges = false;
           _currentTab.lastModified = fileStat.modified;
         });
+        _persistSession();
         _showSnackBar('File saved successfully');
       }
     } else {
@@ -708,6 +813,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         _setupFileWatcher(_currentTab);
       }
 
+      _persistSession();
       _showSnackBar('File saved successfully');
     }
   }
